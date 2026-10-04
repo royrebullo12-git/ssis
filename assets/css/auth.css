@@ -1,0 +1,77 @@
+/* SSIS auth screens. No inline styles are used anywhere (CSP: style-src 'self'). */
+:root {
+  --ink: #13263b;
+  --ink-soft: #4a5b6d;
+  --panel: #0f3a4a;
+  --panel-text: #e8f1f4;
+  --bg: #eef2f5;
+  --card: #ffffff;
+  --line: #cfd8df;
+  --ok: #1d7a4d;
+  --wait: #b36b00;
+  --err: #a8201a;
+  --err-bg: #fbeceb;
+  --info-bg: #e7f0f8;
+  --focus: #1b6fd1;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--bg); line-height: 1.5; }
+
+.shell { min-height: 100vh; display: grid; grid-template-columns: minmax(320px, 5fr) minmax(360px, 6fr); }
+
+/* Left: context panel */
+.intro { background: var(--panel); color: var(--panel-text); padding: 3rem clamp(1.5rem, 5vw, 4.5rem); display: flex; flex-direction: column; justify-content: center; gap: 1.25rem; }
+.brand { margin: 0; font-weight: 700; letter-spacing: .12em; font-size: .95rem; opacity: .85; }
+.intro h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(1.9rem, 3.4vw, 2.8rem); line-height: 1.15; margin: 0; max-width: 18ch; }
+.lead { margin: 0; max-width: 46ch; color: #c5d9e0; }
+
+/* The memorable element: a clearance slip with stamps */
+.slip { margin-top: 1rem; max-width: 22rem; background: #fbfaf6; color: var(--ink); border-radius: 4px; padding: 1rem 1.25rem 1.1rem; transform: rotate(-1.5deg); box-shadow: 0 10px 24px rgba(0, 0, 0, .28); border-top: 6px solid #d9d2bd; }
+.slip-head { font-family: var(--serif); font-size: 1.05rem; font-weight: 700; padding-bottom: .5rem; border-bottom: 1px dashed #b9b29c; margin-bottom: .4rem; }
+.slip ul { list-style: none; margin: 0; padding: 0; }
+.slip li { display: flex; justify-content: space-between; align-items: center; padding: .5rem 0; border-bottom: 1px dashed #d9d2bd; }
+.slip li:last-child { border-bottom: 0; }
+.stamp { font-size: .8rem; padding: .1rem .55rem; border: 2px solid currentColor; border-radius: 3px; transform: rotate(-3deg); }
+.stamp.ok { color: var(--ok); }
+.stamp.wait { color: var(--wait); border-style: dashed; }
+
+/* Right: form */
+.panel { display: flex; align-items: center; justify-content: center; padding: 2rem 1.25rem; }
+form { width: 100%; max-width: 25rem; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 2rem 1.75rem; }
+form h2 { margin: 0 0 .25rem; font-family: var(--serif); font-size: 1.6rem; }
+.hint { margin: 0 0 1.25rem; color: var(--ink-soft); font-size: .92rem; }
+
+label { display: block; margin: 1rem 0 .3rem; font-weight: 600; font-size: .92rem; }
+input[type="text"], input[type="password"] { width: 100%; padding: .7rem .8rem; font: inherit; color: var(--ink); background: #fff; border: 1px solid #93a3b1; border-radius: 6px; }
+input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.pw { position: relative; }
+.pw input { padding-right: 4.5rem; }
+.ghost { position: absolute; right: .35rem; top: 50%; transform: translateY(-50%); background: none; border: 0; color: var(--focus); font: inherit; font-size: .9rem; font-weight: 600; padding: .35rem .55rem; cursor: pointer; border-radius: 4px; }
+.caps { margin: .35rem 0 0; font-size: .85rem; color: var(--wait); }
+
+.btn { display: block; width: 100%; margin-top: 1.5rem; padding: .8rem 1rem; font: inherit; font-weight: 700; text-align: center; text-decoration: none; color: #fff; background: var(--panel); border: 0; border-radius: 6px; cursor: pointer; }
+.btn:hover { background: #0b2f3c; }
+.btn[disabled] { opacity: .65; cursor: progress; }
+
+.msg { padding: .7rem .85rem; border-radius: 6px; font-size: .92rem; margin-bottom: .25rem; }
+.msg.error { background: var(--err-bg); color: var(--err); border: 1px solid #e6b7b4; }
+.msg.info { background: var(--info-bg); color: #1d4a73; border: 1px solid #b9d2e8; }
+.foot { margin: 1.25rem 0 0; font-size: .85rem; color: var(--ink-soft); text-align: center; }
+
+/* 403 page */
+.plain { display: grid; place-items: center; min-height: 100vh; }
+.denied { max-width: 30rem; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 2rem; }
+.denied h1 { font-family: var(--serif); font-size: 1.5rem; margin-top: 0; }
+
+@media (max-width: 820px) {
+  .shell { grid-template-columns: 1fr; }
+  .intro { padding: 1.75rem 1.5rem; }
+  .slip { display: none; }
+  .intro h1 { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
