@@ -1,0 +1,3 @@
+# Block direct web access to non-page folders (Apache). Pages also self-guard with SSIS_BOOT.
+Options -Indexes
+RedirectMatch 403 ^/?(.*/)?(includes|config|database)/
