@@ -1,25 +1,27 @@
 -- =====================================================================
--- Student Services Information System (SSIS) - CCS109
+-- Student Services Information System (SSIS) - Combined fresh-install schema
 -- Database: ssis_db  |  Engine: InnoDB  |  Charset: utf8mb4
--- Run:  mysql -u root -p < database/schema.sql
+-- phpMyAdmin: select/create the ssis_db database, then import this file once.
+-- CLI: mysql -u root -p ssis_db < database/ssis_enhanced_schema.sql
+-- WARNING: destructive fresh install; this script drops existing SSIS tables.
+-- Do not import into a database containing data you need to keep.
 -- =====================================================================
 
-CREATE DATABASE IF NOT EXISTS ssis_db
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE ssis_db;
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS audit_logs, document_requests, document_types, payments,
-                     clearances, grades, subjects, students, login_attempts,
-                     users, departments;
+                     clearances, grades, enrollments, subject_offerings,
+                     professors, subjects, students, login_attempts, users, departments;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ---------------------------------------------------------------------
 -- ERD SUMMARY (1 = one, N = many)
---   departments 1--N students | departments 1--N subjects
---   users       1--1 students (student accounts only)
---   students    1--N grades | clearances | payments | document_requests
---   subjects    1--N grades
+--   departments 1--N students | subjects | professors | users
+--   students    1--N enrollments | clearances | payments | document_requests
+--   subjects    1--N subject_offerings
+--   professors  1--N subject_offerings
+--   subject_offerings 1--N enrollments | enrollments 1--0..1 grades
+--   users       1--1 students/professors (optional for professors)
 --   document_types 1--N document_requests
 --   payments    1--0..1 document_requests (fee payment for a request)
 --   users       1--N audit_logs | users 1--N login_attempts (by username)
@@ -38,8 +40,8 @@ CREATE TABLE users (
   username         VARCHAR(50)  NOT NULL,
   email            VARCHAR(120) NOT NULL,
   password_hash    VARCHAR(255) NOT NULL,
-  role             ENUM('student','registrar','cashier','department','admin') NOT NULL,
-  department_id    INT UNSIGNED NULL COMMENT 'Set for role=department only',
+  role             ENUM('admin','registrar','cashier','department','professor','student') NOT NULL,
+  department_id    INT UNSIGNED NULL COMMENT 'Set for department and professor roles',
   status           ENUM('active','disabled') NOT NULL DEFAULT 'active',
   failed_attempts  TINYINT UNSIGNED NOT NULL DEFAULT 0,
   locked_until     DATETIME NULL,
@@ -75,21 +77,24 @@ CREATE TABLE students (
   program           VARCHAR(100) NOT NULL,
   year_level        TINYINT UNSIGNED NOT NULL DEFAULT 1,
   department_id     INT UNSIGNED NOT NULL,
-  enrollment_status ENUM('not_enrolled','queued','for_assessment','for_payment','enrolled')
-                    NOT NULL DEFAULT 'not_enrolled',
-  queue_number      INT UNSIGNED NULL,
+  enrollment_status ENUM('pending','active','archived')
+                    NOT NULL DEFAULT 'pending',
+  queue_number      INT UNSIGNED NULL COMMENT 'Legacy field retained for backward compatibility; not used by SSIS',
   contact_no        VARCHAR(20)  NULL,
+  registered_by     INT UNSIGNED NULL,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_students_user (user_id),
   UNIQUE KEY uq_students_no (student_no),
   KEY idx_students_name (last_name, first_name),
-  KEY idx_students_enrollment (enrollment_status, queue_number),
+  KEY idx_students_enrollment (enrollment_status),
   CONSTRAINT fk_students_user FOREIGN KEY (user_id)
     REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_students_department FOREIGN KEY (department_id)
-    REFERENCES departments(id) ON DELETE RESTRICT ON UPDATE CASCADE
+    REFERENCES departments(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_students_registered_by FOREIGN KEY (registered_by)
+    REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE subjects (
@@ -98,32 +103,96 @@ CREATE TABLE subjects (
   title          VARCHAR(120) NOT NULL,
   units          TINYINT UNSIGNED NOT NULL DEFAULT 3,
   department_id  INT UNSIGNED NOT NULL,
+  is_active      TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (id),
   UNIQUE KEY uq_subjects_code (code),
   CONSTRAINT fk_subjects_department FOREIGN KEY (department_id)
     REFERENCES departments(id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE professors (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id        INT UNSIGNED NULL,
+  department_id  INT UNSIGNED NOT NULL,
+  first_name     VARCHAR(60) NOT NULL,
+  last_name      VARCHAR(60) NOT NULL,
+  email          VARCHAR(120) NULL,
+  status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_professors_user (user_id),
+  KEY idx_professors_department (department_id, status),
+  CONSTRAINT fk_professor_user FOREIGN KEY (user_id)
+    REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_professor_department FOREIGN KEY (department_id)
+    REFERENCES departments(id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE subject_offerings (
+  id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  subject_id         INT UNSIGNED NOT NULL,
+  professor_id       INT UNSIGNED NOT NULL,
+  academic_year      CHAR(9) NOT NULL COMMENT 'e.g. 2025-2026',
+  semester           ENUM('1st','2nd','summer') NOT NULL,
+  section            VARCHAR(30) NOT NULL,
+  schedule           VARCHAR(120) NULL,
+  is_active          TINYINT(1) NOT NULL DEFAULT 1,
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_offering_subject_term_section (subject_id, academic_year, semester, section),
+  KEY idx_offering_professor_term (professor_id, academic_year, semester),
+  CONSTRAINT fk_offering_subject FOREIGN KEY (subject_id)
+    REFERENCES subjects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_offering_professor FOREIGN KEY (professor_id)
+    REFERENCES professors(id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE enrollments (
+  id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  student_id          INT UNSIGNED NOT NULL,
+  subject_offering_id INT UNSIGNED NOT NULL,
+  status              ENUM('pending','enrolled','dropped') NOT NULL DEFAULT 'enrolled',
+  enrolled_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_enrollment_student_offering (student_id, subject_offering_id),
+  KEY idx_enrollment_offering_status (subject_offering_id, status),
+  CONSTRAINT fk_enrollment_student FOREIGN KEY (student_id)
+    REFERENCES students(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_enrollment_offering FOREIGN KEY (subject_offering_id)
+    REFERENCES subject_offerings(id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE grades (
-  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  student_id   INT UNSIGNED NOT NULL,
-  subject_id   INT UNSIGNED NOT NULL,
-  school_year  CHAR(9)      NOT NULL COMMENT 'e.g. 2025-2026',
-  semester     ENUM('1st','2nd','summer') NOT NULL,
-  grade        DECIMAL(3,2) NULL COMMENT '1.00 (best) to 5.00; NULL = not yet encoded',
-  remarks      ENUM('passed','failed','incomplete','dropped','pending') NOT NULL DEFAULT 'pending',
-  encoded_by   INT UNSIGNED NULL,
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  enrollment_id  INT UNSIGNED NOT NULL,
+  prelim         DECIMAL(5,2) NULL,
+  midterm        DECIMAL(5,2) NULL,
+  final          DECIMAL(5,2) NULL,
+  computed_final DECIMAL(5,2) NULL,
+  status         ENUM('draft','submitted','approved','returned','rejected') NOT NULL DEFAULT 'draft',
+  remarks        VARCHAR(500) NULL,
+  encoded_by     INT UNSIGNED NULL COMMENT 'Professor user who last encoded the grade',
+  reviewed_by    INT UNSIGNED NULL,
+  reviewed_at    DATETIME NULL,
   created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_grade_term (student_id, subject_id, school_year, semester),
-  KEY idx_grades_term (school_year, semester),
-  CONSTRAINT chk_grade_range CHECK (grade IS NULL OR (grade >= 1.00 AND grade <= 5.00)),
-  CONSTRAINT fk_grades_student FOREIGN KEY (student_id)
-    REFERENCES students(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_grades_subject FOREIGN KEY (subject_id)
-    REFERENCES subjects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  UNIQUE KEY uq_grade_enrollment (enrollment_id),
+  KEY idx_grades_status (status, updated_at),
+  CONSTRAINT chk_grade_range CHECK (
+    (prelim IS NULL OR (prelim >= 1.00 AND prelim <= 5.00)) AND
+    (midterm IS NULL OR (midterm >= 1.00 AND midterm <= 5.00)) AND
+    (final IS NULL OR (final >= 1.00 AND final <= 5.00)) AND
+    (computed_final IS NULL OR (computed_final >= 1.00 AND computed_final <= 5.00))
+  ),
+  CONSTRAINT fk_grades_enrollment FOREIGN KEY (enrollment_id)
+    REFERENCES enrollments(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_grades_encoder FOREIGN KEY (encoded_by)
+    REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_grades_reviewer FOREIGN KEY (reviewed_by)
     REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
@@ -253,9 +322,17 @@ INSERT INTO users (username, email, password_hash, role, department_id) VALUES
   ('2024-0001',  'juan.delacruz@ssis.edu.ph', '$2b$10$sodcD7jMKoXuJDcqJx6WM.689JO9RxJnT2/S37xIUT/VVg9nkizS2', 'student',  NULL),
   ('2024-0002',  'maria.santos@ssis.edu.ph',  '$2b$10$sodcD7jMKoXuJDcqJx6WM.689JO9RxJnT2/S37xIUT/VVg9nkizS2', 'student',  NULL);
 
-INSERT INTO students (user_id, student_no, first_name, last_name, program, year_level, department_id, enrollment_status, queue_number, contact_no) VALUES
-  (5, '2024-0001', 'Juan',  'Dela Cruz', 'BS Information Technology', 2, 1, 'queued',   14, '09171234567'),
-  (6, '2024-0002', 'Maria', 'Santos',    'BS Computer Science',       3, 1, 'enrolled', NULL, '09181234567');
+INSERT INTO users (username, email, password_hash, role, department_id) VALUES
+  ('prof.ccs1', 'prof.ccs1@ssis.edu.ph', '$2b$10$sodcD7jMKoXuJDcqJx6WM.689JO9RxJnT2/S37xIUT/VVg9nkizS2', 'professor', 1);
+
+INSERT INTO professors (user_id, department_id, first_name, last_name, email) VALUES
+  (7, 1, 'Alex', 'Reyes', 'prof.ccs1@ssis.edu.ph');
+
+INSERT INTO students
+(user_id, student_no, first_name, last_name, program, year_level, department_id, enrollment_status, queue_number, contact_no, registered_by)
+VALUES
+(5, '2024-0001', 'Juan', 'Dela Cruz', 'BS Information Technology', 2, 1, 'pending', NULL, '09171234567', 2),
+(6, '2024-0002', 'Maria', 'Santos', 'BS Computer Science', 3, 1, 'active', NULL, '09181234567', 2);
 
 INSERT INTO subjects (code, title, units, department_id) VALUES
   ('CCS101', 'Introduction to Computing',        3, 1),
@@ -263,12 +340,22 @@ INSERT INTO subjects (code, title, units, department_id) VALUES
   ('CCS109', 'System Analysis and Design',       3, 1),
   ('GE101',  'Understanding the Self',           3, 1);
 
-INSERT INTO grades (student_id, subject_id, school_year, semester, grade, remarks, encoded_by) VALUES
-  (1, 1, '2025-2026', '1st', 1.75, 'passed',  2),
-  (1, 2, '2025-2026', '1st', 2.00, 'passed',  2),
-  (1, 4, '2025-2026', '1st', 1.50, 'passed',  2),
-  (2, 1, '2025-2026', '1st', 1.25, 'passed',  2),
-  (2, 3, '2025-2026', '1st', NULL, 'pending', 2);
+INSERT INTO subject_offerings (subject_id, professor_id, academic_year, semester, section, schedule) VALUES
+  (1, 1, '2025-2026', '1st', 'A', 'Mon/Wed 8:00-9:30'),
+  (2, 1, '2025-2026', '1st', 'A', 'Tue/Thu 9:30-11:00'),
+  (3, 1, '2025-2026', '1st', 'A', 'Mon/Wed 10:00-11:30'),
+  (4, 1, '2025-2026', '1st', 'A', 'Fri 8:00-11:00');
+
+INSERT INTO enrollments (student_id, subject_offering_id, status) VALUES
+  (1, 1, 'enrolled'), (1, 2, 'enrolled'), (1, 4, 'enrolled'),
+  (2, 1, 'enrolled'), (2, 3, 'enrolled');
+
+INSERT INTO grades (enrollment_id, prelim, midterm, final, computed_final, status, encoded_by, reviewed_by, reviewed_at) VALUES
+  (1, 1.75, 1.75, 1.75, 1.75, 'approved', 7, 4, NOW()),
+  (2, 2.00, 2.00, 2.00, 2.00, 'approved', 7, 4, NOW()),
+  (3, 1.50, 1.50, 1.50, 1.50, 'approved', 7, 4, NOW()),
+  (4, 1.25, 1.25, 1.25, 1.25, 'approved', 7, 4, NOW()),
+  (5, NULL, NULL, NULL, NULL, 'draft', 7, NULL, NULL);
 
 INSERT INTO clearances (student_id, clearance_type, department_id, school_year, semester, status, remarks, reviewed_by, reviewed_at) VALUES
   (1, 'registrar',  NULL, '2025-2026', '1st', 'pending',  NULL, NULL, NULL),

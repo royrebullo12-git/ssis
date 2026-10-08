@@ -20,6 +20,7 @@ $notices = [
     'loggedout' => 'You have been signed out.',
 ];
 $reason = $_GET['reason'] ?? '';
+$portal = is_string($_GET['portal'] ?? null) ? $_GET['portal'] : '';
 $notice = is_string($reason) && isset($notices[$reason]) ? $notices[$reason] : null;
 
 $error    = null;
@@ -56,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <aside class="intro" aria-labelledby="intro-title">
       <p class="brand">SSIS</p>
       <h1 id="intro-title">Clearance, grades and records in one place.</h1>
-      <p class="lead">Check where your clearance stands, see your grades, and track document requests without queuing at three windows.</p>
+      <p class="lead">Review approved grades, manage classes, and track student services in one secure portal.</p>
 
       <div class="slip" aria-hidden="true">
         <div class="slip-head">Clearance slip</div>
@@ -70,8 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <main class="panel">
       <form method="post" action="<?= e(url('/auth/login.php')) ?>" id="login-form" novalidate>
-        <h2>Sign in</h2>
-        <p class="hint">Students use their student number. Staff use the username given by the Admin office.</p>
+        <h2><?= $portal === "registrar" ? "Registrar Admissions" : "Sign in" ?></h2>
+        <p class="hint"><?= $portal === "registrar" ? "Authorized Registrar and Admissions staff use the username provided by the Admin office." : "Students use their student number. Staff use the username given by the Admin office." ?></p>
 
         <?php if ($notice): ?>
           <div class="msg info" role="status"><?= e($notice) ?></div>

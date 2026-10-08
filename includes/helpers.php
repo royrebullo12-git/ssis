@@ -28,8 +28,15 @@ function label(string $v): string { return ucfirst(str_replace('_', ' ', $v)); }
 
 function badge(string $status): string
 {
-    $good = ['approved', 'paid', 'enrolled', 'passed', 'released', 'ready', 'active'];
-    $warn = ['pending', 'partial', 'queued', 'for_assessment', 'for_payment', 'submitted', 'awaiting_payment', 'processing', 'incomplete'];
+    $gradeStatuses = [
+        'draft' => 'secondary', 'submitted' => 'info', 'approved' => 'good',
+        'returned' => 'warn', 'rejected' => 'bad',
+    ];
+    if (isset($gradeStatuses[$status])) {
+        return '<span class="badge ' . $gradeStatuses[$status] . '">' . e(label($status)) . '</span>';
+    }
+    $good = ['paid', 'enrolled', 'passed', 'released', 'ready', 'active'];
+    $warn = ['pending', 'partial', 'awaiting_payment', 'processing', 'incomplete'];
     $cls  = in_array($status, $good, true) ? 'good' : (in_array($status, $warn, true) ? 'warn' : 'bad');
     return '<span class="badge ' . $cls . '">' . e(label($status)) . '</span>';
 }
@@ -85,12 +92,6 @@ function student_balance(int $studentId): float
 function new_reference(string $prefix): string
 {
     return $prefix . '-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
-}
-
-function remarks_from_grade(?float $g): string
-{
-    if ($g === null) return 'pending';
-    return $g <= 3.00 ? 'passed' : 'failed';
 }
 
 function redirect_self(): void

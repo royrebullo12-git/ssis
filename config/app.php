@@ -30,10 +30,11 @@ const ROLE_HOME = [
     'registrar'  => '/registrar/dashboard.php',
     'cashier'    => '/cashier/dashboard.php',
     'department' => '/department/dashboard.php',
+    'professor'  => '/professor/dashboard.php',
     'admin'      => '/admin/dashboard.php',
 ];
 
-const ALL_ROLES = ['student', 'registrar', 'cashier', 'department', 'admin'];
+const ALL_ROLES = ['admin', 'registrar', 'cashier', 'department', 'professor', 'student'];
 
 error_reporting(E_ALL);
 ini_set('display_errors', '0');   // never leak stack traces

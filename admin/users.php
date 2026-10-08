@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/layout.php';
 $user = require_role('admin');
 $pdo  = db();
 
-const STAFF = ['registrar', 'cashier', 'department', 'admin'];
+const STAFF = ['registrar', 'cashier', 'department', 'professor', 'admin'];
 
 function pw_error(string $p): ?string
 {
@@ -34,14 +34,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) $err = 'Enter a valid email address.';
             elseif (!is_string($pw) || ($e1 = pw_error($pw))) $err = $e1 ?? 'Invalid password.';
             elseif (!in_array($role, ALL_ROLES, true)) $err = 'Choose a role.';
-            elseif (in_array($role, ['department', 'student'], true) && !$dept) $err = 'Choose a department for this role.';
+            elseif (in_array($role, ['department', 'professor', 'student'], true) && !$dept) $err = 'Choose a department for this role.';
             elseif ($role === 'student' && ($first === '' || $last === '' || $prog === '' || $year < 1 || $year > 6)) $err = 'Students need a first name, last name, program and year level (1-6). The username is the student number.';
+            elseif ($role === 'professor' && ($first === '' || $last === '')) $err = 'Professors need a first and last name.';
             if ($err) { flash('error', $err); }
             else {
                 $pdo->beginTransaction();
                 $pdo->prepare('INSERT INTO users (username, email, password_hash, role, department_id) VALUES (?, ?, ?, ?, ?)')
-                    ->execute([$username, $email, password_hash($pw, PASSWORD_DEFAULT), $role, in_array($role, ['department'], true) ? $dept : null]);
+                    ->execute([$username, $email, password_hash($pw, PASSWORD_DEFAULT), $role, in_array($role, ['department', 'professor'], true) ? $dept : null]);
                 $uid = (int)$pdo->lastInsertId();
+                if ($role === 'professor') {
+                    $profile = $pdo->prepare('SELECT id FROM professors WHERE user_id IS NULL AND department_id = ? AND email = ? ORDER BY id LIMIT 1 FOR UPDATE');
+                    $profile->execute([$dept, $email]);
+                    $professorId = $profile->fetchColumn();
+                    if ($professorId) {
+                        $pdo->prepare("UPDATE professors SET user_id = ?, first_name = ?, last_name = ?, status = 'active' WHERE id = ?")
+                            ->execute([$uid, $first, $last, $professorId]);
+                    } else {
+                        $pdo->prepare('INSERT INTO professors (user_id, department_id, first_name, last_name, email) VALUES (?, ?, ?, ?, ?)')
+                            ->execute([$uid, $dept, $first, $last, $email]);
+                    }
+                }
                 if ($role === 'student') {
                     $pdo->prepare('INSERT INTO students (user_id, student_no, first_name, last_name, program, year_level, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
                         ->execute([$uid, $username, $first, $last, $prog, $year, $dept]);
@@ -61,6 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             elseif ($new === 'disabled' && $target['role'] === 'admin' && active_admins($pdo) <= 1) flash('error', 'At least one active admin must remain.');
             else {
                 $pdo->prepare('UPDATE users SET status = ? WHERE id = ?')->execute([$new, $id]);
+                if ($target['role'] === 'professor') {
+                    $pdo->prepare('UPDATE professors SET status = ? WHERE user_id = ?')
+                        ->execute([$new === 'active' ? 'active' : 'inactive', $id]);
+                }
                 audit_log('USER_' . strtoupper($new), (int)$user['id'], $user['username'], 'user', $id, $target['username']);
                 flash('success', "{$target['username']} is now {$new}.");
             }
@@ -82,10 +99,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $new = post_str('role', 12); $dept = post_int('department_id') ?: null;
             if ($self) flash('error', 'You cannot change your own role.');
             elseif ($target['role'] === 'student' || !in_array($new, STAFF, true)) flash('error', 'Student accounts keep the student role; staff roles can only be changed among staff roles.');
-            elseif ($new === 'department' && !$dept) flash('error', 'Choose a department for the department role.');
+            elseif (in_array($new, ['department', 'professor'], true) && !$dept) flash('error', 'Choose a department for this role.');
             elseif ($target['role'] === 'admin' && $new !== 'admin' && active_admins($pdo) <= 1) flash('error', 'At least one active admin must remain.');
             else {
-                $pdo->prepare('UPDATE users SET role = ?, department_id = ? WHERE id = ?')->execute([$new, $new === 'department' ? $dept : null, $id]);
+                $pdo->beginTransaction();
+                $pdo->prepare('UPDATE users SET role = ?, department_id = ? WHERE id = ?')
+                    ->execute([$new, in_array($new, ['department', 'professor'], true) ? $dept : null, $id]);
+                if ($target['role'] === 'professor' && $new !== 'professor') {
+                    $pdo->prepare("UPDATE professors SET user_id = NULL, status = 'inactive' WHERE user_id = ?")->execute([$id]);
+                } elseif ($new === 'professor') {
+                    $profile = $pdo->prepare('SELECT id FROM professors WHERE user_id = ?');
+                    $profile->execute([$id]);
+                    $professorId = $profile->fetchColumn();
+                    if ($professorId) {
+                        $pdo->prepare("UPDATE professors SET department_id = ?, status = 'active' WHERE id = ?")->execute([$dept, $professorId]);
+                    } else {
+                        $unlinked = $pdo->prepare('SELECT id FROM professors WHERE user_id IS NULL AND department_id = ? AND email = ? ORDER BY id LIMIT 1 FOR UPDATE');
+                        $unlinked->execute([$dept, $target['email']]);
+                        $unlinkedId = $unlinked->fetchColumn();
+                        if ($unlinkedId) {
+                            $pdo->prepare("UPDATE professors SET user_id = ?, status = 'active' WHERE id = ?")->execute([$id, $unlinkedId]);
+                        } else {
+                            $pdo->prepare("INSERT INTO professors (user_id, department_id, first_name, last_name, email) VALUES (?, ?, ?, 'Faculty', ?)")
+                                ->execute([$id, $dept, $target['username'], $target['email']]);
+                        }
+                    }
+                }
+                $pdo->commit();
                 audit_log('ROLE_CHANGED', (int)$user['id'], $user['username'], 'user', $id, "{$target['username']}: {$target['role']} -> {$new}");
                 flash('success', "{$target['username']} is now {$new}.");
             }
@@ -117,11 +157,11 @@ render_header($user, 'User accounts');
     <div><label for="email">Email</label><input id="email" name="email" type="email" maxlength="120" required></div>
     <div><label for="password">Temporary password</label><input id="password" name="password" type="password" maxlength="200" required autocomplete="new-password"></div>
     <div><label for="role">Role</label><select id="role" name="role" required><?php foreach (ALL_ROLES as $r): ?><option value="<?= $r ?>"><?= e(label($r)) ?></option><?php endforeach; ?></select></div>
-    <div><label for="department_id">Department (students and department staff)</label><select id="department_id" name="department_id"><?= $deptOpts ?></select></div>
+    <div><label for="department_id">Department (students, professors and department staff)</label><select id="department_id" name="department_id"><?= $deptOpts ?></select></div>
   </div>
   <div class="row">
-    <div><label for="first_name">First name (students)</label><input id="first_name" name="first_name" type="text" maxlength="60"></div>
-    <div><label for="last_name">Last name (students)</label><input id="last_name" name="last_name" type="text" maxlength="60"></div>
+    <div><label for="first_name">First name (students / professors)</label><input id="first_name" name="first_name" type="text" maxlength="60"></div>
+    <div><label for="last_name">Last name (students / professors)</label><input id="last_name" name="last_name" type="text" maxlength="60"></div>
     <div><label for="program">Program (students)</label><input id="program" name="program" type="text" maxlength="100"></div>
     <div><label for="year_level">Year level (students)</label><input id="year_level" name="year_level" type="number" min="1" max="6" value="1"></div>
   </div>
@@ -143,7 +183,7 @@ render_header($user, 'User accounts');
       <?php if ($r['role'] !== 'student' && (int)$r['id'] !== (int)$user['id']): ?>
         <?= form_open('role') ?><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
         <select name="role" aria-label="Role"><?php foreach (STAFF as $s): ?><option value="<?= $s ?>"<?= $s === $r['role'] ? ' selected' : '' ?>><?= e(label($s)) ?></option><?php endforeach; ?></select>
-        <select name="department_id" aria-label="Department"><?= $deptOpts ?></select><button class="btn alt sm" type="submit" data-confirm="Change this user's role?">Set role</button></form>
+        <select name="department_id" aria-label="Department"><?php foreach ($depts as $d): ?><option value="<?= (int)$d['id'] ?>"<?= (int)$d['id'] === (int)$r['department_id'] ? ' selected' : '' ?>><?= e($d['code']) ?></option><?php endforeach; ?></select><button class="btn alt sm" type="submit" data-confirm="Change this user's role?">Set role</button></form>
       <?php endif; ?>
     </div></td></tr>
 <?php endforeach; ?></tbody></table></div>

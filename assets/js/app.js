@@ -14,6 +14,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const q = input.value.trim().toLowerCase();
       rows.forEach((r) => { r.hidden = q !== '' && !r.textContent.toLowerCase().includes(q); });
     });
+    document.querySelectorAll('[data-dialog-open]').forEach((button) => {
+      const dialog = document.getElementById(button.getAttribute('data-dialog-open'));
+      if (dialog && typeof dialog.showModal === 'function') {
+        button.addEventListener('click', () => dialog.showModal());
+        dialog.addEventListener('click', (event) => {
+          if (event.target === dialog) dialog.close();
+        });
+      }
+    });
+    document.querySelectorAll('[data-dialog-close]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const dialog = button.closest('dialog');
+        if (dialog && typeof dialog.close === 'function') dialog.close();
+      });
+    });
   });
   // Prevent double-submits on forms.
   document.querySelectorAll('form').forEach((f) => {
