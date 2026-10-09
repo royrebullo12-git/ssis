@@ -48,16 +48,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in - Student Services Information System</title>
+  <title>Sign in - Wilson University (WLS)</title>
+  <link rel="icon" type="image/svg+xml" href="<?= e(url('/assets/wls-logo.svg')) ?>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="<?= e(url('/assets/css/auth.css')) ?>">
+  <link rel="stylesheet" href="<?= e(url('/assets/css/wls.css')) ?>?v=<?= (string)filemtime(__DIR__ . '/../assets/css/wls.css') ?>">
   <script src="<?= e(url('/assets/js/login.js')) ?>" defer></script>
 </head>
 <body>
   <div class="shell">
     <aside class="intro" aria-labelledby="intro-title">
-      <p class="brand">SSIS</p>
-      <h1 id="intro-title">Clearance, grades and records in one place.</h1>
-      <p class="lead">Review approved grades, manage classes, and track student services in one secure portal.</p>
+      <div class="auth-brand"><img src="<?= e(url('/assets/wls-logo.svg')) ?>" alt=""><span>Wilson University</span></div>
+      
+      <h1 id="intro-title">Your university, connected.</h1>
+      <p class="lead">Access academic records, enrollment, and student services in the secure WLS portal.</p>
 
       <div class="slip" aria-hidden="true">
         <div class="slip-head">Clearance slip</div>
@@ -97,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="caps" id="caps-note" hidden>Caps Lock is on.</p>
 
         <button type="submit" class="btn" id="submit-btn">Sign in</button>
-        <p class="foot">Forgot your password? Ask the Admin office to reset it.</p>
+        <p class="foot"><a href="<?= e(url('/auth/forgot_password.php')) ?>">Forgot your password?</a></p>
       </form>
     </main>
   </div>

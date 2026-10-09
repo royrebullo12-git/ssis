@@ -47,7 +47,7 @@ render_header($user, 'Registrar overview');
   </aside>
 </div>
 <div class="card"><div class="section-title"><div><p class="card-kicker">RECENT</p><h2>Recently registered students</h2></div><a href="<?= e(url('/registrar/students.php')) ?>">View all</a></div>
-<div class="tablewrap"><table><thead><tr><th>Student</th><th>Program</th><th>Status</th><th>Registered</th></tr></thead><tbody>
+<div class="tablewrap table-responsive"><table><thead><tr><th>Student</th><th>Program</th><th>Status</th><th>Registered</th></tr></thead><tbody>
 <?php foreach($recent as $r): ?><tr><td><strong><?= e($r['student_no']) ?></strong><br><small><?= e($r['last_name'].', '.$r['first_name']) ?></small></td><td><?= e($r['program']) ?></td><td><?= badge($r['enrollment_status']) ?></td><td><?= e(fmt_date($r['created_at'])) ?></td></tr><?php endforeach; ?>
 </tbody></table></div></div>
 <?php render_footer();

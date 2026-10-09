@@ -1,3 +1,9 @@
-# Block direct web access to non-page folders (Apache). Pages also self-guard with SSIS_BOOT.
-Options -Indexes
-RedirectMatch 403 ^/?(.*/)?(includes|config|database)/
+# Apache 2.4 hardening. Application routes continue to self-guard with SSIS_BOOT.
+Options -Indexes -MultiViews
+ServerSignature Off
+
+# Keep application internals, local tooling, and database exports off the web.
+RedirectMatch 403 ^/?(.*/)?(includes|config|database|\.github|\.git|vendor)(/|$)
+<FilesMatch "(^\.|\.sql$|\.md$|^composer\.(json|lock)$|^\.env)">
+  Require all denied
+</FilesMatch>

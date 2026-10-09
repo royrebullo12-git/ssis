@@ -28,7 +28,7 @@ render_header($user, 'Clearance status');
 <?php if (!$all): ?>
   <div class="card empty">No clearance records yet. The Registrar creates them at the start of each term.</div>
 <?php else: ?>
-  <div class="tablewrap"><table><thead><tr><th>Term</th><th>Office</th><th>Status</th><th>Remarks</th><th>Updated</th></tr></thead><tbody>
+  <div class="tablewrap table-responsive"><table><thead><tr><th>Term</th><th>Office</th><th>Status</th><th>Remarks</th><th>Updated</th></tr></thead><tbody>
   <?php foreach ($all as $c): ?>
     <tr><td><?= e($c['school_year'] . ', ' . $c['semester']) ?></td><td><?= e($office($c)) ?></td><td><?= badge($c['status']) ?></td>
         <td><?= e($c['remarks'] ?? '') ?></td><td><?= e(fmt_date($c['reviewed_at'])) ?></td></tr>

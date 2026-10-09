@@ -52,11 +52,48 @@ function clearance_review_page(array $user, string $type, string $title): void
     if (!in_array($status, ['pending', 'approved', 'rejected', 'all'], true)) $status = 'pending';
     $q = get_str('q', 60);
 
-    $sql = "SELECT c.id, c.status, c.remarks, c.reviewed_at, s.student_no, s.first_name, s.last_name, s.program
+    $registrarFilters = $type === 'registrar';
+    if ($registrarFilters) {
+        $years = array_values(array_unique(array_map('strval', $pdo->query(
+            'SELECT DISTINCT school_year FROM clearances WHERE clearance_type = "registrar" ORDER BY school_year DESC'
+        )->fetchAll(PDO::FETCH_COLUMN))));
+        $departments = $pdo->query('SELECT id, code FROM departments ORDER BY code')->fetchAll();
+        $readMulti = static function (string $key): array {
+            $value = $_GET[$key] ?? [];
+            if (is_string($value) && $value !== '') $value = [$value];
+            if (!is_array($value)) return [];
+            return array_values(array_unique(array_filter($value, static fn($item): bool => is_string($item))));
+        };
+        $selectedYears = array_values(array_intersect($readMulti('academic_year'), $years));
+        $selectedSemesters = array_values(array_intersect($readMulti('semester'), ['1st', '2nd', 'summer']));
+        $validDepartmentIds = array_map(static fn(array $department): string => (string)$department['id'], $departments);
+        $selectedDepartments = array_values(array_intersect($readMulti('department'), $validDepartmentIds));
+        $selectedStatuses = array_values(array_intersect($readMulti('status'), ['pending', 'approved', 'rejected']));
+    }
+
+    $sql = "SELECT c.id, c.status, c.remarks, c.reviewed_at, c.school_year, c.semester,
+                   s.student_no, s.first_name, s.last_name, s.program, d.code AS department_code
               FROM clearances c JOIN students s ON s.id = c.student_id
-             WHERE c.clearance_type = ? AND {$scopeSql} AND c.school_year = ? AND c.semester = ?";
-    $params = array_merge([$type], $scopeParams, [CURRENT_SY, CURRENT_SEM]);
-    if ($status !== 'all') { $sql .= ' AND c.status = ?'; $params[] = $status; }
+              JOIN departments d ON d.id = s.department_id
+             WHERE c.clearance_type = ? AND {$scopeSql}";
+    $params = array_merge([$type], $scopeParams);
+    if (!$registrarFilters) {
+        $sql .= ' AND c.school_year = ? AND c.semester = ?';
+        array_push($params, CURRENT_SY, CURRENT_SEM);
+    } else {
+        foreach ([
+            ['c.school_year', $selectedYears],
+            ['c.semester', $selectedSemesters],
+            ['s.department_id', array_map('intval', $selectedDepartments)],
+            ['c.status', $selectedStatuses],
+        ] as [$column, $values]) {
+            if ($values) {
+                $sql .= ' AND ' . $column . ' IN (' . implode(',', array_fill(0, count($values), '?')) . ')';
+                array_push($params, ...$values);
+            }
+        }
+    }
+    if (!$registrarFilters && $status !== 'all') { $sql .= ' AND c.status = ?'; $params[] = $status; }
     if ($q !== '') {
         $sql .= ' AND (s.student_no LIKE ? OR s.last_name LIKE ? OR s.first_name LIKE ?)';
         $like = '%' . addcslashes($q, '%_\\') . '%';
@@ -68,28 +105,43 @@ function clearance_review_page(array $user, string $type, string $title): void
     $rows = $st->fetchAll();
 
     render_header($user, $title);
-    echo '<p class="muted">Term: ' . e(CURRENT_SY) . ', ' . e(CURRENT_SEM) . ' semester'
+    echo '<p class="muted">' . ($registrarFilters ? 'Use the filters to view clearance records across academic terms.' : 'Term: ' . e(CURRENT_SY) . ', ' . e(CURRENT_SEM) . ' semester')
        . ($type === 'cashier' ? '. A clearance can only be approved when the student has no unpaid balance.' : '') . '</p>';
-    echo '<form class="filters" method="get"><div><label for="q">Search</label><input id="q" name="q" type="text" value="' . e($q) . '" placeholder="Student no. or name"></div>'
-       . '<div><label for="status">Status</label><select id="status" name="status">';
-    foreach (['pending', 'approved', 'rejected', 'all'] as $s) {
-        echo '<option value="' . $s . '"' . ($s === $status ? ' selected' : '') . '>' . e(label($s)) . '</option>';
+    echo '<form class="filters card" method="get"><div><label for="q">Search</label><input id="q" name="q" type="search" value="' . e($q) . '" placeholder="Student no. or name"></div>';
+    if ($registrarFilters) {
+        echo '<div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year[]" multiple size="3">';
+        foreach ($years as $year) echo '<option value="' . e($year) . '"' . (in_array($year, $selectedYears, true) ? ' selected' : '') . '>' . e($year) . '</option>';
+        echo '</select></div><div><label for="semester">Term / semester</label><select id="semester" name="semester[]" multiple size="3">';
+        foreach (['1st', '2nd', 'summer'] as $term) echo '<option value="' . e($term) . '"' . (in_array($term, $selectedSemesters, true) ? ' selected' : '') . '>' . e(label($term)) . '</option>';
+        echo '</select></div><div><label for="department">Department</label><select id="department" name="department[]" multiple size="3">';
+        foreach ($departments as $department) echo '<option value="' . (int)$department['id'] . '"' . (in_array((string)$department['id'], $selectedDepartments, true) ? ' selected' : '') . '>' . e($department['code']) . '</option>';
+        echo '</select></div><div><label for="status">Status</label><select id="status" name="status[]" multiple size="3">';
+        foreach (['pending', 'approved', 'rejected'] as $clearanceStatus) echo '<option value="' . e($clearanceStatus) . '"' . (in_array($clearanceStatus, $selectedStatuses, true) ? ' selected' : '') . '>' . e(label($clearanceStatus)) . '</option>';
+        echo '</select></div>';
+    } else {
+        echo '<div><label for="status">Status</label><select id="status" name="status">';
+        foreach (['pending', 'approved', 'rejected', 'all'] as $s) {
+            echo '<option value="' . $s . '"' . ($s === $status ? ' selected' : '') . '>' . e(label($s)) . '</option>';
+        }
+        echo '</select></div>';
     }
-    echo '</select></div><button class="btn" type="submit">Filter</button></form>';
+    echo '<button class="btn" type="submit">Apply filters</button><a class="btn alt" href="' . e(url($type === 'registrar' ? '/registrar/clearances.php' : ($type === 'cashier' ? '/cashier/clearances.php' : '/department/clearances.php'))) . '">Clear</a></form>';
 
     if (!$rows) {
         echo '<div class="card empty">No clearances match these filters.</div>';
     } else {
-        echo '<div class="tablewrap"><table><thead><tr><th>Student</th><th>Program</th><th>Status</th><th>Reviewed</th><th>Decision</th></tr></thead><tbody>';
+        echo '<div class="tablewrap table-responsive"><table><thead><tr><th>Student</th><th>Program</th>' . ($registrarFilters ? '<th>Department</th><th>Academic term</th>' : '') . '<th>Status</th><th>Reviewed</th><th>Decision</th></tr></thead><tbody>';
         foreach ($rows as $r) {
             echo '<tr><td>' . e($r['student_no']) . '<br>' . e($r['last_name'] . ', ' . $r['first_name']) . '</td>'
-               . '<td>' . e($r['program']) . '</td><td>' . badge($r['status'])
+               . '<td>' . e($r['program']) . '</td>'
+               . ($registrarFilters ? '<td>' . e($r['department_code']) . '</td><td>' . e($r['school_year'] . ' · ' . label($r['semester'])) . '</td>' : '')
+               . '<td>' . badge($r['status'])
                . ($r['remarks'] ? '<br><small>' . e($r['remarks']) . '</small>' : '') . '</td>'
-               . '<td>' . e(fmt_date($r['reviewed_at'])) . '</td><td><div class="actions">'
-               . form_open() . '<input type="hidden" name="id" value="' . (int)$r['id'] . '">'
-               . '<input type="text" name="remarks" maxlength="255" placeholder="Remarks" aria-label="Remarks">'
-               . '<button class="btn ok sm" name="action" value="approve" type="submit">Approve</button>'
-               . '<button class="btn danger sm" name="action" value="reject" type="submit">Reject</button></form>'
+               . '<td>' . e(fmt_date($r['reviewed_at'])) . '</td><td><div class="d-flex flex-column gap-2">'
+               . form_open('', 'class="d-flex flex-column gap-2"') . '<input type="hidden" name="id" value="' . (int)$r['id'] . '">'
+               . '<div class="w-100"><input class="form-control form-control-sm w-100" type="text" name="remarks" maxlength="255" placeholder="Remarks" aria-label="Remarks"></div>'
+               . '<div class="d-flex flex-wrap gap-2"><button class="btn btn-success btn-sm" name="action" value="approve" type="submit">Approve</button>'
+               . '<button class="btn btn-danger btn-sm" name="action" value="reject" type="submit">Reject</button></div></form>'
                . '</div></td></tr>';
         }
         echo '</tbody></table></div>';

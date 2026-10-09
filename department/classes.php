@@ -40,7 +40,7 @@ render_header($user, 'Department class lists');
 </select></div><button class="btn" type="submit">View class</button></form>
 <?php if ($offeringId && !$rows): ?><div class="card empty">No enrolled students in this offering.</div>
 <?php elseif ($rows): ?><div class="card"><h2>Enrolled students</h2><label for="class-filter">Search students</label><input id="class-filter" type="text" data-filter="#department-class-list" placeholder="Student number, name, or program">
-  <div class="tablewrap"><table id="department-class-list"><thead><tr><th>Student number</th><th>Student</th><th>Program</th><th>Enrollment</th><th>Grade status</th></tr></thead><tbody>
+  <div class="tablewrap table-responsive"><table id="department-class-list"><thead><tr><th>Student number</th><th>Student</th><th>Program</th><th>Enrollment</th><th>Grade status</th></tr></thead><tbody>
   <?php foreach ($rows as $row): ?>
     <tr><td><?= e($row['student_no']) ?></td><td><?= e($row['last_name'] . ', ' . $row['first_name']) ?></td><td><?= e($row['program']) ?></td>
       <td><?= badge($row['enrollment_status']) ?></td><td><?= $row['grade_status'] ? badge($row['grade_status']) : '-' ?></td></tr>

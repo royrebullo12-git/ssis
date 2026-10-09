@@ -24,7 +24,7 @@ render_header($user, 'Cashier dashboard');
 </div>
 <h2>Latest payments</h2>
 <?php if (!$recent): ?><div class="card empty">No payments recorded yet.</div><?php else: ?>
-<div class="tablewrap"><table><thead><tr><th>Reference</th><th>Student</th><th>Description</th><th class="num">Paid</th><th>Status</th><th>When</th></tr></thead><tbody>
+<div class="tablewrap table-responsive"><table><thead><tr><th>Reference</th><th>Student</th><th>Description</th><th class="num">Paid</th><th>Status</th><th>When</th></tr></thead><tbody>
 <?php foreach ($recent as $r): ?><tr><td><?= e($r['reference_no']) ?></td><td><?= e($r['student_no']) ?></td><td><?= e($r['description']) ?></td>
   <td class="num"><?= e(money($r['amount_paid'])) ?></td><td><?= badge($r['status']) ?></td><td><?= e(fmt_date($r['paid_at'])) ?></td></tr><?php endforeach; ?>
 </tbody></table></div><?php endif; render_footer();

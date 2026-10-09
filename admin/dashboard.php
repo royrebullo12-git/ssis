@@ -34,7 +34,7 @@ render_header($user,'Administrator overview');
 <aside class="card"><p class="card-kicker">SECURITY</p><h2>Access monitoring</h2><p><strong><?= $locked ?></strong> locked account(s)</p><p><strong><?= $failed ?></strong> failed sign-in attempts in the last 24 hours</p><a class="btn alt" href="<?= e(url('/admin/audit.php')) ?>">Open audit log</a></aside>
 </div>
 <h2>Latest activity</h2>
-<div class="tablewrap"><table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead><tbody>
+<div class="tablewrap table-responsive"><table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead><tbody>
 <?php foreach($recent as $r): ?><tr><td><?= e(fmt_date($r['created_at'])) ?></td><td><?= e($r['username']??'-') ?></td><td><?= e($r['action']) ?></td><td><?= e($r['details']??'') ?></td><td><?= e($r['ip_address']) ?></td></tr><?php endforeach; ?>
 </tbody></table></div>
 <?php render_footer();

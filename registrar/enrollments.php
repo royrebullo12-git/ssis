@@ -73,38 +73,74 @@ $offerings = $pdo->query(
       WHERE o.is_active = 1 AND s.is_active = 1 AND p.status = 'active'
       ORDER BY o.academic_year DESC, o.semester, s.code, o.section"
 )->fetchAll();
-$rows = $pdo->query(
-    "SELECT e.status, e.enrolled_at, s.student_no, s.first_name, s.last_name,
+$departments = $pdo->query('SELECT id, code FROM departments ORDER BY code')->fetchAll();
+$termYears = $pdo->query('SELECT DISTINCT academic_year FROM subject_offerings ORDER BY academic_year DESC')->fetchAll(PDO::FETCH_COLUMN);
+$readMulti = static function (string $key): array {
+    $value = $_GET[$key] ?? [];
+    if (is_string($value) && $value !== '') $value = [$value];
+    if (!is_array($value)) return [];
+    return array_values(array_unique(array_filter($value, static fn($item): bool => is_string($item))));
+};
+$years = array_values(array_intersect($readMulti('academic_year'), $termYears));
+$semesters = array_values(array_intersect($readMulti('semester'), ['1st', '2nd', 'summer']));
+$statuses = array_values(array_intersect($readMulti('status'), ['pending', 'enrolled', 'dropped']));
+$departmentIds = array_values(array_intersect($readMulti('department'), array_map(static fn(array $row): string => (string)$row['id'], $departments)));
+$conditions = [];
+$params = [];
+foreach ([
+    ['s.department_id', array_map('intval', $departmentIds)],
+    ['e.status', $statuses],
+    ['o.academic_year', $years],
+    ['o.semester', $semesters],
+] as [$column, $values]) {
+    if ($values) {
+        $conditions[] = $column . ' IN (' . implode(',', array_fill(0, count($values), '?')) . ')';
+        array_push($params, ...$values);
+    }
+}
+$enrollmentQuery =
+    "SELECT e.status, e.enrolled_at, s.student_no, s.first_name, s.last_name, d.code AS department_code,
             sub.code, sub.title, o.academic_year, o.semester, o.section,
             CONCAT(p.first_name, ' ', p.last_name) AS professor
        FROM enrollments e
        JOIN students s ON s.id = e.student_id
+       JOIN departments d ON d.id = s.department_id
        JOIN subject_offerings o ON o.id = e.subject_offering_id
        JOIN subjects sub ON sub.id = o.subject_id
-       JOIN professors p ON p.id = o.professor_id
-      ORDER BY e.enrolled_at DESC LIMIT 200"
-)->fetchAll();
+       JOIN professors p ON p.id = o.professor_id";
+if ($conditions) $enrollmentQuery .= ' WHERE ' . implode(' AND ', $conditions);
+$enrollmentQuery .= ' ORDER BY e.enrolled_at DESC LIMIT 1000';
+$rowQuery = $pdo->prepare($enrollmentQuery);
+$rowQuery->execute($params);
+$rows = $rowQuery->fetchAll();
 
 render_header($user, 'Enrollment processing');
 ?>
 <div class="card"><h2>Enroll a student in an offering</h2>
   <?php if (!$students || !$offerings): ?><p class="empty">An active student and an active department offering are required before enrollment.</p>
   <?php else: ?>
-  <?= form_open() ?><div class="row">
-    <div><label for="student_id">Student</label><select id="student_id" name="student_id" required>
+  <?= form_open() ?><div class="row g-3">
+    <div class="col-12 col-md-6"><label for="student_id">Student</label><select id="student_id" name="student_id" required>
       <?php foreach ($students as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['student_no'] . ' - ' . $s['last_name'] . ', ' . $s['first_name']) ?></option><?php endforeach; ?>
     </select></div>
-    <div><label for="subject_offering_id">Subject offering</label><select id="subject_offering_id" name="subject_offering_id" required>
+    <div class="col-12 col-md-6"><label for="subject_offering_id">Subject offering</label><select id="subject_offering_id" name="subject_offering_id" required>
       <?php foreach ($offerings as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['code'] . ' - ' . $o['title'] . ' / ' . $o['academic_year'] . ' ' . $o['semester'] . ' / ' . $o['section'] . ' / ' . $o['professor']) ?></option><?php endforeach; ?>
     </select></div>
   </div><p><button class="btn" type="submit">Enroll student</button></p></form>
   <?php endif; ?>
 </div>
 <div class="card"><h2>Recent enrollments</h2>
+  <form class="filters card" method="get">
+    <div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year[]" multiple size="3"><?php foreach ($termYears as $year): ?><option value="<?= e($year) ?>"<?= in_array($year, $years, true) ? ' selected' : '' ?>><?= e($year) ?></option><?php endforeach; ?></select></div>
+    <div><label for="semester">Term / semester</label><select id="semester" name="semester[]" multiple size="3"><?php foreach (['1st', '2nd', 'summer'] as $semester): ?><option value="<?= e($semester) ?>"<?= in_array($semester, $semesters, true) ? ' selected' : '' ?>><?= e(label($semester)) ?></option><?php endforeach; ?></select></div>
+    <div><label for="department">Department</label><select id="department" name="department[]" multiple size="3"><?php foreach ($departments as $department): ?><option value="<?= (int)$department['id'] ?>"<?= in_array((string)$department['id'], $departmentIds, true) ? ' selected' : '' ?>><?= e($department['code']) ?></option><?php endforeach; ?></select></div>
+    <div><label for="status">Enrollment status</label><select id="status" name="status[]" multiple size="3"><?php foreach (['pending', 'enrolled', 'dropped'] as $enrollmentStatus): ?><option value="<?= e($enrollmentStatus) ?>"<?= in_array($enrollmentStatus, $statuses, true) ? ' selected' : '' ?>><?= e(label($enrollmentStatus)) ?></option><?php endforeach; ?></select></div>
+    <button class="btn" type="submit">Apply filters</button><a class="btn alt" href="<?= e(url('/registrar/enrollments.php')) ?>">Clear</a>
+  </form>
   <label for="enrollment-filter">Search enrollments</label><input id="enrollment-filter" type="text" data-filter="#registrar-enrollments" placeholder="Student, subject, section, or term">
-  <div class="tablewrap"><table id="registrar-enrollments"><thead><tr><th>Student</th><th>Subject offering</th><th>Professor</th><th>Term</th><th>Status</th></tr></thead><tbody>
+  <div class="tablewrap table-responsive"><table id="registrar-enrollments"><thead><tr><th>Student</th><th>Department</th><th>Subject offering</th><th>Professor</th><th>Term</th><th>Status</th></tr></thead><tbody>
   <?php foreach ($rows as $r): ?><tr>
-    <td><?= e($r['student_no'] . ' - ' . $r['last_name'] . ', ' . $r['first_name']) ?></td>
+    <td><?= e($r['student_no'] . ' - ' . $r['last_name'] . ', ' . $r['first_name']) ?></td><td><?= e($r['department_code']) ?></td>
     <td><?= e($r['code'] . ' - ' . $r['title'] . ' / ' . $r['section']) ?></td><td><?= e($r['professor']) ?></td>
     <td><?= e($r['academic_year'] . ', ' . $r['semester']) ?></td><td><?= badge($r['status']) ?></td>
   </tr><?php endforeach; ?>

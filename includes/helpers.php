@@ -35,8 +35,8 @@ function badge(string $status): string
     if (isset($gradeStatuses[$status])) {
         return '<span class="badge ' . $gradeStatuses[$status] . '">' . e(label($status)) . '</span>';
     }
-    $good = ['paid', 'enrolled', 'passed', 'released', 'ready', 'active'];
-    $warn = ['pending', 'partial', 'awaiting_payment', 'processing', 'incomplete'];
+    $good = ['paid', 'enrolled', 'passed', 'released', 'ready', 'active', 'regular'];
+    $warn = ['pending', 'partial', 'awaiting_payment', 'processing', 'incomplete', 'unconfigured'];
     $cls  = in_array($status, $good, true) ? 'good' : (in_array($status, $warn, true) ? 'warn' : 'bad');
     return '<span class="badge ' . $cls . '">' . e(label($status)) . '</span>';
 }
@@ -89,9 +89,72 @@ function student_balance(int $studentId): float
     return max(0.0, (float)$st->fetchColumn());
 }
 
+/** Compare registered units against the entered curriculum requirement for the current term. */
+function student_unit_status(array $student, string $schoolYear = CURRENT_SY, string $semester = CURRENT_SEM): array
+{
+    $pdo = db();
+    $units = $pdo->prepare(
+        "SELECT COALESCE(SUM(sub.units), 0)
+           FROM enrollments e
+           JOIN subject_offerings o ON o.id = e.subject_offering_id
+           JOIN subjects sub ON sub.id = o.subject_id
+          WHERE e.student_id = ? AND e.status = 'enrolled'
+            AND o.academic_year = ? AND o.semester = ?"
+    );
+    $units->execute([(int)$student['id'], $schoolYear, $semester]);
+    $enrolled = (int)$units->fetchColumn();
+    $requirement = $pdo->prepare(
+        'SELECT required_units FROM curriculum_requirements
+          WHERE program = ? AND year_level = ? AND academic_year = ? AND semester = ? LIMIT 1'
+    );
+    $requirement->execute([$student['program'], (int)$student['year_level'], $schoolYear, $semester]);
+    $required = $requirement->fetchColumn();
+    return [
+        'status' => $required === false ? 'unconfigured' : ($enrolled >= (int)$required ? 'regular' : 'irregular'),
+        'enrolled_units' => $enrolled,
+        'required_units' => $required === false ? null : (int)$required,
+    ];
+}
+
 function new_reference(string $prefix): string
 {
     return $prefix . '-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+}
+
+function next_student_number(PDO $pdo, ?string $academicYear = null): string
+{
+    $yearPrefix = $academicYear !== null && preg_match('/^\d{4}-\d{4}$/', $academicYear)
+        ? substr($academicYear, 0, 4)
+        : substr(CURRENT_SY, 0, 4);
+    $lockName = 'wls-student-number-' . $yearPrefix;
+    $lock = $pdo->prepare('SELECT GET_LOCK(?, 10)');
+    $lock->execute([$lockName]);
+    if ((int)$lock->fetchColumn() !== 1) {
+        throw new RuntimeException('Could not reserve a student number. Please try again.');
+    }
+
+    try {
+        $statement = $pdo->prepare(
+            'SELECT COALESCE(MAX(CAST(SUBSTRING(student_no, 6) AS UNSIGNED)), 0)
+               FROM students WHERE student_no LIKE ?'
+        );
+        $statement->execute([$yearPrefix . '-%']);
+        $nextNumber = (int)$statement->fetchColumn() + 1;
+        return $yearPrefix . '-' . str_pad((string)$nextNumber, 4, '0', STR_PAD_LEFT);
+    } catch (Throwable $e) {
+        $release = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+        $release->execute([$lockName]);
+        throw $e;
+    }
+}
+
+function release_student_number_lock(PDO $pdo, ?string $academicYear = null): void
+{
+    $yearPrefix = $academicYear !== null && preg_match('/^\d{4}-\d{4}$/', $academicYear)
+        ? substr($academicYear, 0, 4)
+        : substr(CURRENT_SY, 0, 4);
+    $release = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+    $release->execute(['wls-student-number-' . $yearPrefix]);
 }
 
 function redirect_self(): void

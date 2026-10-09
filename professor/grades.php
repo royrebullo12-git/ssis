@@ -119,7 +119,7 @@ render_header($user, 'Class roster and grade encoding');
 </select></div><button class="btn" type="submit">View roster</button></form>
 <?php if ($offeringId && !$rows): ?><div class="card empty">No enrolled students in this offering, or this offering is not assigned to your profile.</div>
 <?php elseif ($rows): ?><label for="roster-filter">Search roster</label><input id="roster-filter" type="text" data-filter="#professor-roster" placeholder="Student number or name">
-<div class="tablewrap"><table id="professor-roster"><thead><tr><th>Student</th><th>Prelim</th><th>Midterm</th><th>Final</th><th>Computed</th><th>Status / feedback</th><th>Save / submit</th></tr></thead><tbody>
+<div class="tablewrap table-responsive"><table id="professor-roster"><thead><tr><th>Student</th><th>Prelim</th><th>Midterm</th><th>Final</th><th>Computed</th><th>Status / feedback</th><th>Save / submit</th></tr></thead><tbody>
 <?php foreach ($rows as $row):
     $status = $row['grade_status'] ?? 'draft';
     $locked = in_array($status, ['submitted', 'approved'], true);

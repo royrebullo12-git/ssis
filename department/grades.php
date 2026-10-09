@@ -3,6 +3,7 @@ declare(strict_types=1);
 define('SSIS_BOOT', true);
 require_once __DIR__ . '/../auth/auth_check.php';
 require_once __DIR__ . '/../includes/layout.php';
+require_once __DIR__ . '/../includes/notifications.php';
 $user = require_role('department');
 $pdo = db();
 $departmentId = (int)($user['department_id'] ?? 0);
@@ -19,9 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('error', 'A remark is required when returning or rejecting a grade.');
     } else {
         $target = $pdo->prepare(
-            'SELECT g.id, g.status, g.computed_final
+            'SELECT g.id, g.status, g.computed_final, st.user_id, s.code, o.semester, o.academic_year
                FROM grades g
                JOIN enrollments e ON e.id = g.enrollment_id
+               JOIN students st ON st.id = e.student_id
                JOIN subject_offerings o ON o.id = e.subject_offering_id
                JOIN subjects s ON s.id = o.subject_id
               WHERE g.id = ? AND s.department_id = ?'
@@ -34,20 +36,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('error', 'A grade requires a computed final mark before it can be approved.');
         } else {
             $nextStatus = ['approve' => 'approved', 'return' => 'returned', 'reject' => 'rejected'][$action];
-            $st = $pdo->prepare(
-                "UPDATE grades g
-                 JOIN enrollments e ON e.id = g.enrollment_id
-                 JOIN subject_offerings o ON o.id = e.subject_offering_id
-                 JOIN subjects s ON s.id = o.subject_id
-                    SET g.status = ?, g.remarks = ?, g.reviewed_by = ?, g.reviewed_at = NOW()
-                  WHERE g.id = ? AND g.status = 'submitted' AND s.department_id = ?"
-            );
-            $st->execute([$nextStatus, $remarks ?: null, (int)$user['id'], $gradeId, $departmentId]);
-            if ($st->rowCount() !== 1) {
-                flash('error', 'The grade changed before your review was saved. Reload and review it again.');
-            } else {
-                audit_log('GRADE_' . strtoupper($nextStatus), (int)$user['id'], $user['username'], 'grade', $gradeId, $remarks);
-                flash('success', 'Grade ' . $nextStatus . '.');
+            $pdo->beginTransaction();
+            try {
+                $st = $pdo->prepare(
+                    "UPDATE grades g
+                     JOIN enrollments e ON e.id = g.enrollment_id
+                     JOIN subject_offerings o ON o.id = e.subject_offering_id
+                     JOIN subjects s ON s.id = o.subject_id
+                        SET g.status = ?, g.remarks = ?, g.reviewed_by = ?, g.reviewed_at = NOW()
+                      WHERE g.id = ? AND g.status = 'submitted' AND s.department_id = ?"
+                );
+                $st->execute([$nextStatus, $remarks ?: null, (int)$user['id'], $gradeId, $departmentId]);
+                if ($st->rowCount() !== 1) {
+                    $pdo->rollBack();
+                    flash('error', 'The grade changed before your review was saved. Reload and review it again.');
+                } else {
+                    create_notification(
+                        (int)$grade['user_id'],
+                        $action === 'approve' ? 'Grade posted' : 'Grade review updated',
+                        $action === 'approve'
+                            ? 'An approved grade for ' . $grade['code'] . ' (' . $grade['semester'] . ' ' . $grade['academic_year'] . ') is now available.'
+                            : 'Your grade for ' . $grade['code'] . ' was ' . $nextStatus . '. ' . ($remarks ?: ''),
+                        '/student/grades.php'
+                    );
+                    audit_log('GRADE_' . strtoupper($nextStatus), (int)$user['id'], $user['username'], 'grade', $gradeId, $remarks);
+                    $pdo->commit();
+                    flash('success', 'Grade ' . $nextStatus . '.');
+                }
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                error_log('[WLS] department grade review failed: ' . $e->getMessage());
+                flash('error', 'The grade decision could not be saved.');
             }
         }
     }
@@ -76,7 +95,7 @@ if (!$rows): ?>
   <div class="card empty">There are no submitted grades awaiting department review.</div>
 <?php else: ?>
   <label for="grade-filter">Search submitted grades</label><input id="grade-filter" type="text" data-filter="#department-grade-review" placeholder="Student, subject, professor, or term">
-  <div class="tablewrap"><table id="department-grade-review"><thead><tr><th>Student</th><th>Subject offering</th><th>Professor</th><th>Marks</th><th>Review</th></tr></thead><tbody>
+  <div class="tablewrap table-responsive"><table id="department-grade-review"><thead><tr><th>Student</th><th>Subject offering</th><th>Professor</th><th>Marks</th><th>Review</th></tr></thead><tbody>
   <?php foreach ($rows as $row): ?><tr>
     <td><?= e($row['student_no'] . ' - ' . $row['last_name'] . ', ' . $row['first_name']) ?></td>
     <td><?= e($row['code'] . ' - ' . $row['title'] . ' / ' . $row['section'] . ' / ' . $row['academic_year'] . ' ' . $row['semester']) ?></td>

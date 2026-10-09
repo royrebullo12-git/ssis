@@ -2,16 +2,17 @@
 -- Student Services Information System (SSIS) - Combined fresh-install schema
 -- Database: ssis_db  |  Engine: InnoDB  |  Charset: utf8mb4
 -- phpMyAdmin: select/create the ssis_db database, then import this file once.
--- CLI: mysql -u root -p ssis_db < database/ssis_enhanced_schema.sql
+-- CLI: mysql -u root -p ssis_db < database/schema.sql
 -- WARNING: destructive fresh install; this script drops existing SSIS tables.
 -- Do not import into a database containing data you need to keep.
 -- =====================================================================
 
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS audit_logs, document_requests, document_types, payments,
-                     clearances, grades, enrollments, subject_offerings,
-                     professors, subjects, students, login_attempts, users, departments;
+DROP TABLE IF EXISTS audit_logs, document_requests, document_types, payment_transactions,
+                     payments, clearances, grades, drop_requests, enrollments,
+                     subject_offerings, professors, curriculum_requirements, subjects,
+                     students, notifications, password_reset_otps, login_attempts, users, departments;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ---------------------------------------------------------------------
@@ -39,7 +40,9 @@ CREATE TABLE users (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
   username         VARCHAR(50)  NOT NULL,
   email            VARCHAR(120) NOT NULL,
+  mobile_phone     VARCHAR(20)  NULL,
   password_hash    VARCHAR(255) NOT NULL,
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0,
   role             ENUM('admin','registrar','cashier','department','professor','student') NOT NULL,
   department_id    INT UNSIGNED NULL COMMENT 'Set for department and professor roles',
   status           ENUM('active','disabled') NOT NULL DEFAULT 'active',
@@ -68,19 +71,56 @@ CREATE TABLE login_attempts (
   KEY idx_attempts_user_time (username, attempted_at)
 ) ENGINE=InnoDB;
 
+CREATE TABLE password_reset_otps (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id      INT UNSIGNED NOT NULL,
+  code_hash    VARCHAR(255) NOT NULL,
+  expires_at   DATETIME NOT NULL,
+  attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  used_at      DATETIME NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_password_otp_user_created (user_id, created_at),
+  KEY idx_password_otp_expiry (expires_at),
+  CONSTRAINT fk_password_otp_user FOREIGN KEY (user_id)
+    REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE notifications (
+  id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id    INT UNSIGNED NOT NULL,
+  title      VARCHAR(120) NOT NULL,
+  body       VARCHAR(500) NOT NULL,
+  link       VARCHAR(255) NULL,
+  read_at    DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_notifications_user_read (user_id, read_at, created_at),
+  CONSTRAINT fk_notifications_user FOREIGN KEY (user_id)
+    REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE students (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id           INT UNSIGNED NOT NULL,
   student_no        VARCHAR(20)  NOT NULL,
   first_name        VARCHAR(60)  NOT NULL,
   last_name         VARCHAR(60)  NOT NULL,
+  middle_name       VARCHAR(60)  NULL,
+  date_of_birth     DATE NULL,
+  gender            VARCHAR(20) NULL,
+  home_address      VARCHAR(255) NULL,
   program           VARCHAR(100) NOT NULL,
   year_level        TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  previous_school   VARCHAR(150) NULL,
+  admission_year    CHAR(9) NULL,
   department_id     INT UNSIGNED NOT NULL,
   enrollment_status ENUM('pending','active','archived')
                     NOT NULL DEFAULT 'pending',
   queue_number      INT UNSIGNED NULL COMMENT 'Legacy field retained for backward compatibility; not used by SSIS',
   contact_no        VARCHAR(20)  NULL,
+  emergency_contact_name  VARCHAR(120) NULL,
+  emergency_contact_phone VARCHAR(20) NULL,
   registered_by     INT UNSIGNED NULL,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -108,6 +148,17 @@ CREATE TABLE subjects (
   UNIQUE KEY uq_subjects_code (code),
   CONSTRAINT fk_subjects_department FOREIGN KEY (department_id)
     REFERENCES departments(id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE curriculum_requirements (
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  program         VARCHAR(100) NOT NULL,
+  year_level      TINYINT UNSIGNED NOT NULL,
+  academic_year   CHAR(9) NOT NULL,
+  semester        ENUM('1st','2nd','summer') NOT NULL,
+  required_units  SMALLINT UNSIGNED NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_curriculum_program_term (program, year_level, academic_year, semester)
 ) ENGINE=InnoDB;
 
 CREATE TABLE professors (
@@ -163,6 +214,32 @@ CREATE TABLE enrollments (
     REFERENCES students(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_enrollment_offering FOREIGN KEY (subject_offering_id)
     REFERENCES subject_offerings(id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE drop_requests (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  student_id   INT UNSIGNED NOT NULL,
+  enrollment_id INT UNSIGNED NOT NULL,
+  department_id INT UNSIGNED NOT NULL,
+  reason       VARCHAR(80) NOT NULL,
+  details      VARCHAR(500) NULL,
+  status       ENUM('submitted','approved','rejected') NOT NULL DEFAULT 'submitted',
+  remarks      VARCHAR(255) NULL,
+  reviewed_by  INT UNSIGNED NULL,
+  reviewed_at  DATETIME NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_drop_requests_department_status (department_id, status, created_at),
+  KEY idx_drop_requests_student (student_id, created_at),
+  CONSTRAINT fk_drop_request_student FOREIGN KEY (student_id)
+    REFERENCES students(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_drop_request_enrollment FOREIGN KEY (enrollment_id)
+    REFERENCES enrollments(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_drop_request_department FOREIGN KEY (department_id)
+    REFERENCES departments(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_drop_request_reviewer FOREIGN KEY (reviewed_by)
+    REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE grades (
@@ -247,14 +324,34 @@ CREATE TABLE payments (
     REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE payment_transactions (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  payment_id   INT UNSIGNED NOT NULL,
+  amount       DECIMAL(10,2) NOT NULL,
+  method       ENUM('cash','gcash','bank','card') NOT NULL,
+  paid_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  processed_by INT UNSIGNED NULL,
+  PRIMARY KEY (id),
+  KEY idx_payment_transactions_paid_at (paid_at, payment_id),
+  CONSTRAINT chk_payment_transaction_amount CHECK (amount > 0),
+  CONSTRAINT fk_payment_transaction_payment FOREIGN KEY (payment_id)
+    REFERENCES payments(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_payment_transaction_processor FOREIGN KEY (processed_by)
+    REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE document_types (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   name        VARCHAR(100) NOT NULL,
   fee         DECIMAL(8,2) NOT NULL DEFAULT 0.00,
   processing_days TINYINT UNSIGNED NOT NULL DEFAULT 3,
+  issuing_office VARCHAR(120) NOT NULL DEFAULT 'Registrar',
+  issuing_department_id INT UNSIGNED NULL,
   is_active   TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_doctype_name (name)
+  UNIQUE KEY uq_doctype_name (name),
+  CONSTRAINT fk_doctype_department FOREIGN KEY (issuing_department_id)
+    REFERENCES departments(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE document_requests (
@@ -264,6 +361,7 @@ CREATE TABLE document_requests (
   purpose          VARCHAR(255) NOT NULL,
   copies           TINYINT UNSIGNED NOT NULL DEFAULT 1,
   fee_amount       DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+  routed_department_id INT UNSIGNED NULL,
   payment_id       INT UNSIGNED NULL,
   status           ENUM('submitted','awaiting_payment','processing','ready','released','rejected','cancelled')
                    NOT NULL DEFAULT 'submitted',
@@ -279,6 +377,8 @@ CREATE TABLE document_requests (
     REFERENCES students(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_docreq_type FOREIGN KEY (document_type_id)
     REFERENCES document_types(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_docreq_department FOREIGN KEY (routed_department_id)
+    REFERENCES departments(id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT fk_docreq_payment FOREIGN KEY (payment_id)
     REFERENCES payments(id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT fk_docreq_processor FOREIGN KEY (processed_by)
@@ -368,6 +468,9 @@ INSERT INTO clearances (student_id, clearance_type, department_id, school_year, 
 INSERT INTO payments (student_id, reference_no, description, amount_due, amount_paid, status, method, paid_at, processed_by) VALUES
   (1, 'PAY-2026-0001', 'Tuition - 1st Sem 2025-2026', 18500.00, 10000.00, 'partial', 'cash',  NOW(), 3),
   (2, 'PAY-2026-0002', 'Tuition - 1st Sem 2025-2026', 18500.00, 18500.00, 'paid',    'gcash', NOW(), 3);
+INSERT INTO payment_transactions (payment_id, amount, method, paid_at, processed_by)
+SELECT id, amount_paid, method, paid_at, processed_by FROM payments
+WHERE amount_paid > 0 AND paid_at IS NOT NULL AND method IS NOT NULL;
 
 INSERT INTO document_types (name, fee, processing_days) VALUES
   ('Certificate of Enrollment',      50.00,  2),

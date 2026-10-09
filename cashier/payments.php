@@ -18,10 +18,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             elseif (mb_strlen($desc) < 3) flash('error', 'Enter a description for the charge.');
             elseif ($amt <= 0 || $amt > 1000000) flash('error', 'Amount must be between 0.01 and 1,000,000.');
             else {
+                $pdo->beginTransaction();
                 $ref = new_reference('PAY');
                 $pdo->prepare("INSERT INTO payments (student_id, reference_no, description, amount_due, status, processed_by) VALUES (?, ?, ?, ?, 'unpaid', ?)")
                     ->execute([$sid, $ref, $desc, $amt, (int)$user['id']]);
+                $studentUser = $pdo->prepare('SELECT user_id FROM students WHERE id = ?');
+                $studentUser->execute([$sid]);
+                $studentUserId = (int)$studentUser->fetchColumn();
+                if ($studentUserId > 0) {
+                    create_notification($studentUserId, 'New balance reminder', 'A new charge of ' . money($amt) . ' was added: ' . $desc . '.', '/student/clearance.php');
+                }
                 audit_log('PAYMENT_CHARGE_CREATED', (int)$user['id'], $user['username'], 'payment', (int)$pdo->lastInsertId(), "{$ref} {$amt}");
+                $pdo->commit();
                 flash('success', "Charge {$ref} created for " . money($amt) . '.');
             }
         } elseif ($action === 'pay') {
@@ -38,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $status  = $newPaid >= (float)$pay['amount_due'] ? 'paid' : 'partial';
                     $pdo->prepare('UPDATE payments SET amount_paid = ?, status = ?, method = ?, paid_at = NOW(), processed_by = ? WHERE id = ?')
                         ->execute([$newPaid, $status, $method, (int)$user['id'], $id]);
+                    $pdo->prepare('INSERT INTO payment_transactions (payment_id, amount, method, processed_by) VALUES (?, ?, ?, ?)')
+                        ->execute([$id, $amt, $method, (int)$user['id']]);
                     doc_after_payment($pdo, $id);
                     $pdo->commit();
                     audit_log('PAYMENT_RECORDED', (int)$user['id'], $user['username'], 'payment', $id, "{$pay['reference_no']} +{$amt} via {$method}");
@@ -61,32 +71,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $q = get_str('q', 60); $status = get_str('status', 10);
 if (!in_array($status, ['unpaid', 'partial', 'paid', 'void'], true)) $status = '';
+$validDate = static function (string $value): string {
+    $date = DateTime::createFromFormat('!Y-m-d', $value);
+    return $date && $date->format('Y-m-d') === $value ? $value : '';
+};
+$dateFromInput = get_str('date_from', 10);
+$dateToInput = get_str('date_to', 10);
+$dateFrom = $validDate($dateFromInput);
+$dateTo = $validDate($dateToInput);
+$invalidDateRange = ($dateFromInput !== '' && $dateFrom === '') || ($dateToInput !== '' && $dateTo === '')
+    || ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo);
 $like = '%' . addcslashes($q, '%_\\') . '%';
+$conditions = ["(? = '' OR s.student_no LIKE ? OR s.last_name LIKE ? OR p.reference_no LIKE ?)", "(? = '' OR p.status = ?)"];
+$params = [$q, $like, $like, $like, $status, $status];
+$transactionDateConditions = [];
+if ($invalidDateRange) $conditions[] = '1 = 0';
+if ($dateFrom !== '') {
+    $transactionDateConditions[] = 'pt.paid_at >= ?';
+    $params[] = $dateFrom . ' 00:00:00';
+}
+if ($dateTo !== '') {
+    $transactionDateConditions[] = 'pt.paid_at < DATE_ADD(?, INTERVAL 1 DAY)';
+    $params[] = $dateTo;
+}
+if ($transactionDateConditions) {
+    $conditions[] = 'EXISTS (SELECT 1 FROM payment_transactions pt WHERE pt.payment_id = p.id AND '
+        . implode(' AND ', $transactionDateConditions) . ')';
+}
 $st = $pdo->prepare(
-    "SELECT p.*, s.student_no, s.first_name, s.last_name FROM payments p JOIN students s ON s.id = p.student_id
-      WHERE (? = '' OR s.student_no LIKE ? OR s.last_name LIKE ? OR p.reference_no LIKE ?) AND (? = '' OR p.status = ?)
-      ORDER BY p.created_at DESC LIMIT 100"
+    'SELECT p.*, s.student_no, s.first_name, s.last_name FROM payments p JOIN students s ON s.id = p.student_id
+      WHERE ' . implode(' AND ', $conditions) . ' ORDER BY p.created_at DESC LIMIT 100'
 );
-$st->execute([$q, $like, $like, $like, $status, $status]);
+$st->execute($params);
 $rows = $st->fetchAll();
 $students = $pdo->query('SELECT id, student_no, last_name, first_name FROM students ORDER BY last_name, first_name')->fetchAll();
+$balanceBreakdown = $pdo->query(
+    "SELECT
+        COALESCE(SUM(CASE WHEN balance_due > balance_paid AND balance_paid = 0 THEN 1 ELSE 0 END), 0) AS unpaid,
+        COALESCE(SUM(CASE WHEN balance_due > balance_paid AND balance_paid > 0 THEN 1 ELSE 0 END), 0) AS partial,
+        COALESCE(SUM(CASE WHEN balance_due > 0 AND balance_paid >= balance_due THEN 1 ELSE 0 END), 0) AS fully_paid
+       FROM (
+         SELECT student_id, SUM(amount_due) AS balance_due, SUM(amount_paid) AS balance_paid
+           FROM payments WHERE status <> 'void' GROUP BY student_id
+       ) AS student_balances"
+)->fetch();
 
 render_header($user, 'Payments');
 ?>
+<div class="grid">
+  <div class="stat"><b><?= (int)$balanceBreakdown['unpaid'] ?></b><span>Unpaid student balances</span></div>
+  <div class="stat"><b><?= (int)$balanceBreakdown['partial'] ?></b><span>Partially paid student balances</span></div>
+  <div class="stat"><b><?= (int)$balanceBreakdown['fully_paid'] ?></b><span>Fully paid student balances</span></div>
+</div>
 <div class="card"><h2>New charge</h2>
-  <?= form_open('charge') ?><div class="row">
-    <div><label for="student_id">Student</label><select id="student_id" name="student_id" required>
+  <?= form_open('charge') ?><div class="row g-3">
+    <div class="col-12 col-md-6 col-xl-4"><label for="student_id">Student</label><select id="student_id" name="student_id" required>
       <?php foreach ($students as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['student_no'] . ' - ' . $s['last_name'] . ', ' . $s['first_name']) ?></option><?php endforeach; ?></select></div>
-    <div><label for="description">Description</label><input id="description" name="description" type="text" maxlength="150" required placeholder="e.g. Laboratory fee"></div>
-    <div><label for="amount">Amount (₱)</label><input id="amount" name="amount" type="number" step="0.01" min="0.01" required></div>
+    <div class="col-12 col-md-6 col-xl-4"><label for="description">Description</label><input id="description" name="description" type="text" maxlength="150" required placeholder="e.g. Laboratory fee"></div>
+    <div class="col-12 col-md-6 col-xl-4"><label for="amount">Amount (₱)</label><input id="amount" name="amount" type="number" step="0.01" min="0.01" required></div>
   </div><p><button class="btn" type="submit">Create charge</button></p></form>
 </div>
-<form class="filters" method="get"><div><label for="q">Search</label><input id="q" name="q" type="text" value="<?= e($q) ?>" placeholder="Student no., name or reference"></div>
+<form class="filters card" method="get"><div><label for="q">Search</label><input id="q" name="q" type="text" value="<?= e($q) ?>" placeholder="Student no., name or reference"></div>
   <div><label for="status">Status</label><select id="status" name="status"><option value="">All</option>
   <?php foreach (['unpaid', 'partial', 'paid', 'void'] as $s): ?><option value="<?= $s ?>"<?= $s === $status ? ' selected' : '' ?>><?= e(label($s)) ?></option><?php endforeach; ?></select></div>
-  <button class="btn" type="submit">Filter</button></form>
+  <div><label for="date_from">Date paid from</label><input id="date_from" name="date_from" type="date" value="<?= e($dateFrom) ?>"></div>
+  <div><label for="date_to">Date paid to</label><input id="date_to" name="date_to" type="date" value="<?= e($dateTo) ?>"></div>
+  <button class="btn" type="submit">Filter</button><a class="btn alt" href="<?= e(url('/cashier/payments.php')) ?>">Clear</a>
+  <a class="btn alt" href="<?= e(url('/cashier/collections.php')) ?>">Collection report</a></form>
+  <?php if ($invalidDateRange): ?><div class="msg error" role="alert">Enter valid payment dates and ensure the start date is not after the end date.</div><?php endif; ?>
 <?php if (!$rows): ?><div class="card empty">No payments match.</div><?php else: ?>
-<div class="tablewrap"><table><thead><tr><th>Reference</th><th>Student</th><th>Description</th><th class="num">Due</th><th class="num">Paid</th><th>Status</th><th>Record payment</th></tr></thead><tbody>
+<div class="tablewrap table-responsive"><table><thead><tr><th>Reference</th><th>Student</th><th>Description</th><th class="num">Due</th><th class="num">Paid</th><th>Status</th><th>Record payment</th></tr></thead><tbody>
 <?php foreach ($rows as $r): $left = (float)$r['amount_due'] - (float)$r['amount_paid']; ?>
   <tr><td><?= e($r['reference_no']) ?></td><td><?= e($r['student_no']) ?><br><small><?= e($r['last_name']) ?></small></td><td><?= e($r['description']) ?></td>
     <td class="num"><?= e(money($r['amount_due'])) ?></td><td class="num"><?= e(money($r['amount_paid'])) ?></td><td><?= badge($r['status']) ?></td>

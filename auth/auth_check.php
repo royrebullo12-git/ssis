@@ -68,8 +68,8 @@ function send_security_headers(): void
     header('X-Frame-Options: DENY');
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: same-origin');
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; "
-         . "style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'");
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net; "
+         . "style-src 'self' https://cdn.jsdelivr.net; script-src 'self' https://cdn.jsdelivr.net; form-action 'self'; frame-ancestors 'none'");
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
 }
@@ -166,7 +166,7 @@ function auth_user(): ?array
     }
 
     $st = db()->prepare(
-        'SELECT id, username, email, role, department_id, status FROM users WHERE id = ? LIMIT 1'
+        'SELECT id, username, email, role, department_id, status, must_change_password FROM users WHERE id = ? LIMIT 1'
     );
     $st->execute([(int)$_SESSION['uid']]);
     $row = $st->fetch();

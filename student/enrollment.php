@@ -5,6 +5,7 @@ require_once __DIR__ . '/../auth/auth_check.php';
 require_once __DIR__ . '/../includes/layout.php';
 $user = require_role('student');
 $stu = student_of($user);
+$unitStatus = student_unit_status($stu);
 $classes = db()->prepare(
     'SELECT sub.code, sub.title, o.section, o.academic_year, o.semester, o.schedule,
             CONCAT(p.first_name, \' \', p.last_name) AS professor, e.status
@@ -41,12 +42,15 @@ render_header($user, 'Enrollment status');
       <dt>Program</dt><dd><?= e($stu['program']) ?></dd>
       <dt>Year level</dt><dd><?= (int)$stu['year_level'] ?></dd>
       <dt>Department</dt><dd><?= e($stu['department_name']) ?></dd>
+      <dt>Current term standing</dt><dd><?= badge($unitStatus['status']) ?></dd>
+      <dt>Enrolled / required units</dt><dd><?= $unitStatus['enrolled_units'] ?><?= $unitStatus['required_units'] !== null ? ' / ' . $unitStatus['required_units'] : ' / Curriculum not configured' ?></dd>
     </dl>
   </aside>
 </div>
+<?php if ($unitStatus['status'] === 'unconfigured'): ?><div class="msg info" role="status">Your regular/irregular standing will appear once the Registrar configures your program's standard units for the current term.</div><?php endif; ?>
 <div class="card"><h2>Registered classes</h2>
   <?php if (!$classes): ?><p class="empty">No subject offerings are currently linked to your student record.</p>
-  <?php else: ?><div class="tablewrap"><table><thead><tr><th>Subject</th><th>Section</th><th>Term</th><th>Schedule</th><th>Professor</th><th>Status</th></tr></thead><tbody>
+  <?php else: ?><div class="tablewrap table-responsive"><table><thead><tr><th>Subject</th><th>Section</th><th>Term</th><th>Schedule</th><th>Professor</th><th>Status</th></tr></thead><tbody>
     <?php foreach ($classes as $class): ?><tr>
       <td><?= e($class['code'] . ' - ' . $class['title']) ?></td><td><?= e($class['section']) ?></td>
       <td><?= e($class['academic_year'] . ', ' . $class['semester']) ?></td>

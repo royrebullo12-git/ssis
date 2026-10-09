@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 72" role="img" aria-labelledby="title">
+  <title id="title">Wilson University crest</title>
+  <path d="M32 3 58 12v21c0 16-10.8 28.2-26 36C16.8 61.2 6 49 6 33V12L32 3Z" fill="#0F2942" stroke="#E6A100" stroke-width="3"/>
+  <path d="m32 12 2.9 7.1 7.6.6-5.8 5 1.8 7.4-6.5-4-6.5 4 1.8-7.4-5.8-5 7.6-.6L32 12Z" fill="#F4C14F"/>
+  <path d="M17 39.5c5.3-1.6 10.3-.6 15 2.5 4.7-3.1 9.7-4.1 15-2.5v13c-5.5-1.2-10.5-.2-15 3-4.5-3.2-9.5-4.2-15-3v-13Z" fill="#fff" stroke="#F4C14F" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M32 42v13M21 43.5v6.2m22-6.2v6.2" fill="none" stroke="#0F2942" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

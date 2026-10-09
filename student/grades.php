@@ -9,11 +9,10 @@ $pdo = db();
 
 $terms = $pdo->prepare(
     "SELECT DISTINCT o.academic_year, o.semester
-       FROM grades g
-       JOIN enrollments e ON e.id = g.enrollment_id
+       FROM enrollments e
        JOIN subject_offerings o ON o.id = e.subject_offering_id
-      WHERE e.student_id = ? AND e.status = 'enrolled' AND g.status = 'approved'
-      ORDER BY o.academic_year DESC, o.semester"
+      WHERE e.student_id = ? AND e.status = 'enrolled'
+      ORDER BY o.academic_year DESC, FIELD(o.semester, '1st', '2nd', 'summer')"
 );
 $terms->execute([(int)$stu['id']]);
 $terms = $terms->fetchAll();
@@ -32,14 +31,15 @@ if ($sy !== '') {
     $st = $pdo->prepare(
         "SELECT sub.code, sub.title, sub.units, o.section,
                 CONCAT(p.first_name, ' ', p.last_name) AS professor,
-                g.computed_final
-           FROM grades g
-           JOIN enrollments e ON e.id = g.enrollment_id
+                CASE WHEN g.status = 'approved' THEN g.computed_final ELSE NULL END AS computed_final,
+                g.status AS grade_status
+           FROM enrollments e
            JOIN subject_offerings o ON o.id = e.subject_offering_id
            JOIN subjects sub ON sub.id = o.subject_id
            JOIN professors p ON p.id = o.professor_id
+           LEFT JOIN grades g ON g.enrollment_id = e.id
           WHERE e.student_id = ? AND e.status = 'enrolled'
-            AND g.status = 'approved' AND o.academic_year = ? AND o.semester = ?
+            AND o.academic_year = ? AND o.semester = ?
           ORDER BY sub.code"
     );
     $st->execute([(int)$stu['id'], $sy, $sem]);
@@ -54,21 +54,31 @@ foreach ($rows as $row) {
     }
 }
 
-render_header($user, 'My approved grades');
+render_header($user, 'My grades');
 if (!$terms): ?>
-  <div class="card empty">No approved grades have been posted yet. Draft and submitted grades are not part of your official record.</div>
+  <div class="card empty">No enrolled subjects were found for any term.</div>
 <?php else: ?>
   <form class="filters" method="get"><div><label for="term">Term</label><select id="term" name="term">
     <?php foreach ($terms as $term): $value = $term['academic_year'] . '|' . $term['semester']; ?>
-      <option value="<?= e($value) ?>"<?= $value === "$sy|$sem" ? ' selected' : '' ?>><?= e($term['academic_year'] . ', ' . $term['semester']) ?></option>
+      <option value="<?= e($value) ?>"<?= $value === "$sy|$sem" ? ' selected' : '' ?>><?= e($term['academic_year'] . ', ' . ['1st' => '1st Semester', '2nd' => '2nd Semester', 'summer' => 'Summer Term'][$term['semester']]) ?></option>
     <?php endforeach; ?></select></div><button class="btn" type="submit">View</button></form>
-  <div class="tablewrap"><table><thead><tr><th>Code</th><th>Subject</th><th>Section</th><th>Professor</th><th class="num">Units</th><th class="num">Approved grade</th></tr></thead><tbody>
-  <?php foreach ($rows as $row): ?>
+  <div class="tablewrap table-responsive"><table class="table table-hover table-bordered align-middle"><thead><tr><th>Code</th><th>Subject</th><th>Section</th><th>Professor</th><th class="num">Units</th><th class="num">Approved grade</th></tr></thead><tbody>
+  <?php if (!$rows): ?>
+    <tr><td colspan="6" class="text-center text-secondary py-4">No grade records were found for this term.</td></tr>
+  <?php else: foreach ($rows as $row): ?>
     <tr><td><?= e($row['code']) ?></td><td><?= e($row['title']) ?></td><td><?= e($row['section']) ?></td>
       <td><?= e($row['professor']) ?></td><td class="num"><?= (int)$row['units'] ?></td>
-      <td class="num"><?= $row['computed_final'] === null ? '-' : e(number_format((float)$row['computed_final'], 2)) ?></td></tr>
-  <?php endforeach; ?></tbody></table></div>
+      <td class="num"><?php if ($row['computed_final'] === null): ?><span class="badge secondary">Pending</span><?php else: $gradeValue = (float)$row['computed_final']; ?><span class="badge <?= $gradeValue <= 3.0 ? 'good' : 'bad' ?>"><?= e(number_format($gradeValue, 2)) ?> · <?= $gradeValue <= 3.0 ? 'Pass' : 'Failed' ?></span><?php endif; ?></td></tr>
+  <?php endforeach; endif; ?></tbody></table></div>
   <p><strong>General weighted average:</strong> <?= $units ? e(number_format($points / $units, 2)) : 'Not available yet' ?>
     <small>(approved and graded subjects only; 1.00 is the highest)</small></p>
+  <section class="grade-legend-footer" aria-label="Grading scale legend">
+    <div class="grade-legend-heading"><strong>Grading legend</strong><small>Confirm the applicable grading policy with your department.</small></div>
+    <div class="grade-legend d-flex flex-wrap gap-2 align-items-center">
+      <?php foreach (['1.00' => '98–100', '1.25' => '95–97', '1.50' => '92–94', '1.75' => '89–91', '2.00' => '86–88', '2.25' => '83–85', '2.50' => '80–82', '2.75' => '77–79', '3.00' => '75', '5.00' => 'Failed'] as $grade => $range): ?>
+        <span class="grade-legend-pill"><strong><?= e($grade) ?></strong> = <?= e($range) ?></span>
+      <?php endforeach; ?>
+    </div>
+  </section>
 <?php endif;
 render_footer();

@@ -30,7 +30,7 @@ render_header($user, 'Professor overview');
 ?>
 <p class="muted">Your assigned subject offerings and grade workload.</p>
 <?php if (!$offerings): ?><div class="card empty">No subject offerings are assigned to your profile.</div>
-<?php else: ?><div class="card"><h2>Assigned classes</h2><div class="tablewrap"><table><thead><tr><th>Subject</th><th>Term / section</th><th>Schedule</th><th>Students</th><th>Submitted for review</th><th></th></tr></thead><tbody>
+<?php else: ?><div class="card"><h2>Assigned classes</h2><div class="tablewrap table-responsive"><table><thead><tr><th>Subject</th><th>Term / section</th><th>Schedule</th><th>Students</th><th>Submitted for review</th><th></th></tr></thead><tbody>
   <?php foreach ($offerings as $offering): ?><tr>
     <td><?= e($offering['code'] . ' - ' . $offering['title']) ?></td>
     <td><?= e($offering['academic_year'] . ', ' . $offering['semester'] . ' / ' . $offering['section']) ?></td>

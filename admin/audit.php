@@ -41,7 +41,7 @@ render_header($user, 'Audit log');
   <button class="btn" type="submit">Filter</button></form>
 <p class="muted"><?= $total ?> entr<?= $total === 1 ? 'y' : 'ies' ?>. Audit entries cannot be edited or deleted from the application.</p>
 <?php if (!$rows): ?><div class="card empty">No log entries match.</div><?php else: ?>
-<div class="tablewrap"><table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead><tbody>
+<div class="tablewrap table-responsive"><table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead><tbody>
 <?php foreach ($rows as $r): ?><tr><td><?= e(fmt_date($r['created_at'])) ?></td><td><?= e($r['username'] ?? '-') ?></td><td><?= e($r['action']) ?></td>
   <td><?= e(($r['entity'] ?? '') . ($r['entity_id'] ? ' #' . $r['entity_id'] : '')) ?></td><td><?= e($r['details'] ?? '') ?></td><td><?= e($r['ip_address']) ?></td></tr><?php endforeach; ?>
 </tbody></table></div>

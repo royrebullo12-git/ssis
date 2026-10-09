@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 if (!defined('SSIS_BOOT')) { http_response_code(403); exit('Direct access forbidden.'); }
+require_once __DIR__ . '/notifications.php';
 
 /**
  * Document request workflow
@@ -28,17 +29,24 @@ function doc_create(int $studentId, int $typeId, string $purpose, int $copies): 
     if (mb_strlen($purpose) < 5) return 'Please state the purpose (at least 5 characters).';
 
     $pdo = db();
-    $t = $pdo->prepare('SELECT id, fee FROM document_types WHERE id = ? AND is_active = 1');
+    $t = $pdo->prepare('SELECT id, fee, issuing_department_id, issuing_office FROM document_types WHERE id = ? AND is_active = 1');
     $t->execute([$typeId]);
     $type = $t->fetch();
     if (!$type) return 'Choose a valid document type.';
 
     $fee = round((float)$type['fee'] * $copies, 2);   // fee always computed server-side
     $ins = $pdo->prepare(
-        'INSERT INTO document_requests (student_id, document_type_id, purpose, copies, fee_amount, status)
-         VALUES (?, ?, ?, ?, ?, "submitted")'
+        'INSERT INTO document_requests (student_id, document_type_id, purpose, copies, fee_amount, routed_department_id, status)
+         VALUES (?, ?, ?, ?, ?, ?, "submitted")'
     );
-    $ins->execute([$studentId, $typeId, $purpose, $copies, $fee]);
+    $departmentId = $type['issuing_department_id'] !== null ? (int)$type['issuing_department_id'] : null;
+    $ins->execute([$studentId, $typeId, $purpose, $copies, $fee, $departmentId]);
+    $office = (string)$type['issuing_office'];
+    if ($departmentId !== null) {
+        notify_role('department', 'New document request', 'A student document request is waiting for ' . $office . '.', '/department/document_requests.php', $departmentId);
+    } else {
+        notify_role('registrar', 'New document request', 'A student document request is waiting for Registrar review.', '/registrar/requests.php');
+    }
     audit_log('DOC_REQUEST_CREATED', $_SESSION['uid'] ?? null, $_SESSION['username'] ?? null,
               'document_request', (int)$pdo->lastInsertId(), "Fee {$fee}");
     return null;
@@ -76,18 +84,21 @@ function doc_cancel(int $studentId, int $requestId): ?string
 }
 
 /** Registrar-side transition. Returns an error string or null. */
-function doc_transition(int $requestId, string $action, string $remarks, int $userId): ?string
+function doc_transition(int $requestId, string $action, string $remarks, int $userId, ?int $departmentId = null): ?string
 {
     $pdo = db();
     $pdo->beginTransaction();
     try {
+        $routing = $departmentId === null ? 'r.routed_department_id IS NULL' : 'r.routed_department_id = ?';
+        $params = $departmentId === null ? [$requestId] : [$requestId, $departmentId];
         $st = $pdo->prepare(
-            'SELECT r.*, t.name AS type_name, p.amount_paid FROM document_requests r
+            'SELECT r.*, t.name AS type_name, p.amount_paid, s.user_id AS student_user_id FROM document_requests r
                JOIN document_types t ON t.id = r.document_type_id
+               JOIN students s ON s.id = r.student_id
                LEFT JOIN payments p ON p.id = r.payment_id
-              WHERE r.id = ? FOR UPDATE'
+              WHERE r.id = ? AND ' . $routing . ' FOR UPDATE'
         );
-        $st->execute([$requestId]);
+        $st->execute($params);
         $r = $st->fetch();
         if (!$r) { $pdo->rollBack(); return 'Request not found.'; }
         if (!in_array($action, DOC_ACTIONS[$r['status']] ?? [], true)) {
@@ -97,9 +108,11 @@ function doc_transition(int $requestId, string $action, string $remarks, int $us
         if ($action === 'reject' && $remarks === '') { $pdo->rollBack(); return 'Enter a reason for rejecting.'; }
 
         $note = $remarks !== '' ? $remarks : $r['remarks'];
+        $newStatus = null;
 
         if ($action === 'accept') {
             if ((float)$r['fee_amount'] > 0) {
+                $newStatus = 'awaiting_payment';
                 $pdo->prepare(
                     'INSERT INTO payments (student_id, reference_no, description, amount_due, status)
                      VALUES (?, ?, ?, ?, "unpaid")'
@@ -109,17 +122,20 @@ function doc_transition(int $requestId, string $action, string $remarks, int $us
                 $pdo->prepare('UPDATE document_requests SET status="awaiting_payment", payment_id=?, remarks=?, processed_by=? WHERE id=?')
                     ->execute([$pid, $note, $userId, $requestId]);
             } else {
+                $newStatus = 'processing';
                 $pdo->prepare('UPDATE document_requests SET status="processing", remarks=?, processed_by=? WHERE id=?')
                     ->execute([$note, $userId, $requestId]);
             }
         } else {
             $new = ['reject' => 'rejected', 'ready' => 'ready', 'released' => 'released'][$action];
+            $newStatus = $new;
             if ($action === 'reject' && $r['payment_id'] && (float)($r['amount_paid'] ?? 0) == 0.0) {
                 $pdo->prepare("UPDATE payments SET status = 'void' WHERE id = ?")->execute([(int)$r['payment_id']]);
             }
             $pdo->prepare('UPDATE document_requests SET status=?, remarks=?, processed_by=? WHERE id=?')
                 ->execute([$new, $note, $userId, $requestId]);
         }
+        create_notification((int)$r['student_user_id'], 'Document request updated', 'Your ' . $r['type_name'] . ' request is now ' . label((string)$newStatus) . '.', '/student/requests.php');
         $pdo->commit();
         audit_log('DOC_REQUEST_' . strtoupper($action), $userId, $_SESSION['username'] ?? null, 'document_request', $requestId, $remarks);
         return null;
@@ -138,4 +154,13 @@ function doc_after_payment(PDO $pdo, int $paymentId): void
             SET r.status = 'processing'
           WHERE r.payment_id = ? AND r.status = 'awaiting_payment' AND p.status = 'paid'"
     )->execute([$paymentId]);
+    $recipients = $pdo->prepare(
+        "SELECT s.user_id, t.name FROM document_requests r
+           JOIN students s ON s.id = r.student_id JOIN document_types t ON t.id = r.document_type_id
+          WHERE r.payment_id = ? AND r.status = 'processing'"
+    );
+    $recipients->execute([$paymentId]);
+    foreach ($recipients->fetchAll() as $recipient) {
+        create_notification((int)$recipient['user_id'], 'Document request in progress', 'Your ' . $recipient['name'] . ' request is now being processed.', '/student/requests.php');
+    }
 }
