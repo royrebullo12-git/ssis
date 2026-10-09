@@ -24,7 +24,21 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 .shell { min-height: 100vh; display: grid; grid-template-columns: minmax(320px, 5fr) minmax(360px, 6fr); }
 
 /* Left: context panel */
-.intro { background: var(--panel); color: var(--panel-text); padding: 3rem clamp(1.5rem, 5vw, 4.5rem); display: flex; flex-direction: column; justify-content: center; gap: 1.25rem; }
+.intro {
+  background-color: var(--panel);
+  background-image:
+    linear-gradient(90deg, rgba(7, 24, 39, .78), rgba(7, 24, 39, .64)),
+    linear-gradient(0deg, rgba(7, 24, 39, .2), transparent 55%),
+    url("../hero-campus.jpg");
+  background-position: center, center, center 48%;
+  background-size: cover;
+  color: var(--panel-text);
+  padding: 3rem clamp(1.5rem, 5vw, 4.5rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.25rem;
+}
 .brand { margin: 0; font-weight: 700; letter-spacing: .12em; font-size: .95rem; opacity: .85; }
 .intro h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(1.9rem, 3.4vw, 2.8rem); line-height: 1.15; margin: 0; max-width: 18ch; }
 .lead { margin: 0; max-width: 46ch; color: #c5d9e0; }
@@ -40,8 +54,20 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 .stamp.wait { color: var(--wait); border-style: dashed; }
 
 /* Right: form */
-.panel { display: flex; align-items: center; justify-content: center; padding: 2rem 1.25rem; }
+.panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(135deg, rgba(248, 250, 252, .86), rgba(231, 238, 245, .8)),
+    url("../hero-campus.jpg");
+  background-position: center, center;
+  background-size: cover;
+}
 form { width: 100%; max-width: 25rem; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 2rem 1.75rem; }
+.panel > #login-form { border-radius: 1.25rem; padding: 2.25rem 2rem; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
 form h2 { margin: 0 0 .25rem; font-family: var(--serif); font-size: 1.6rem; }
 .hint { margin: 0 0 1.25rem; color: var(--ink-soft); font-size: .92rem; }
 
