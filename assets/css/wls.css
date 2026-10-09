@@ -3402,6 +3402,20 @@ main.page[data-page="account.php"] .content-grid > .card {
     ) auto;
   align-items: end;
 }
+.department-subject-edit > summary {
+  cursor: pointer;
+  list-style: none;
+  width: max-content;
+}
+.department-subject-edit > summary::-webkit-details-marker {
+  display: none;
+}
+.department-subject-edit > form {
+  margin-top: 0.65rem;
+}
+.faculty-assignment-list {
+  margin-top: 1.25rem;
+}
 .department-subject-submit {
   display: flex;
   min-width: 0;

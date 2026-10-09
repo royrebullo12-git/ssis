@@ -72,15 +72,15 @@ render_header($user, 'Department academic setup');
 <section class="card">
   <h2>Department subjects</h2>
   <?php if (!$subjects): ?><div class="empty">No subjects have been added to this department.</div><?php else: ?>
-  <div class="tablewrap table-responsive"><table><thead><tr><th>Code</th><th>Title</th><th>Units</th><th>Status</th><th>Update</th><th></th></tr></thead><tbody>
+  <div class="tablewrap table-responsive"><table><thead><tr><th>Code</th><th>Title</th><th>Units</th><th>Status</th><th>Edit</th><th></th></tr></thead><tbody>
   <?php foreach ($subjects as $subject): ?><tr>
     <td><?= e($subject['code']) ?></td><td><?= e($subject['title']) ?></td><td><?= (int)$subject['units'] ?></td>
     <td><?= badge((int)$subject['is_active'] ? 'active' : 'inactive') ?></td>
-    <td><?= form_open('save_subject') ?><input type="hidden" name="id" value="<?= (int)$subject['id'] ?>">
+    <td><details class="department-subject-edit"><summary class="btn alt sm">Edit</summary><?= form_open('save_subject') ?><input type="hidden" name="id" value="<?= (int)$subject['id'] ?>">
       <input type="text" name="code" value="<?= e($subject['code']) ?>" aria-label="Subject code" required>
       <input type="text" name="title" value="<?= e($subject['title']) ?>" aria-label="Subject title" required>
       <input type="number" name="units" min="1" max="30" value="<?= (int)$subject['units'] ?>" aria-label="Units" required>
-      <button class="btn alt sm" type="submit">Save</button></form></td>
+      <button class="btn alt sm" type="submit">Save</button></form></details></td>
     <td><?= form_open('toggle_subject') ?><input type="hidden" name="id" value="<?= (int)$subject['id'] ?>">
       <button class="btn alt sm" type="submit"><?= (int)$subject['is_active'] ? 'Deactivate' : 'Activate' ?></button></form></td>
   </tr><?php endforeach; ?>

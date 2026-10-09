@@ -176,7 +176,7 @@ render_header($user, 'Faculty profiles and instructor assignments');
   <?php endif; ?>
 </section>
 </div>
-<section class="card">
+<section class="card faculty-assignment-list">
   <h2>Subject offerings and assignments</h2>
   <?php if (!$offerings): ?><div class="empty">No instructor assignments have been created.</div><?php else: ?>
   <div class="tablewrap table-responsive"><table><thead><tr><th>Offering</th><th>Term</th><th>Instructor assignment</th><th>Status</th><th>Manage assignment</th></tr></thead><tbody>
