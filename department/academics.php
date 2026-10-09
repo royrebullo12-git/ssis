@@ -59,14 +59,14 @@ render_header($user, 'Department academic setup');
   <a class="btn gold" href="<?= e(url('/department/faculty.php')) ?>">Manage faculty and assignments</a>
 </div>
 <section class="card">
-  <p class="card-kicker">SUBJECT CATALOG</p><h2>Create a subject</h2>
-  <?= form_open('save_subject') ?>
-    <div class="form-grid form-grid-3">
+  <h2>Create a subject</h2>
+  <?= form_open('save_subject', 'class="department-subject-form"') ?>
+    <div class="form-grid form-grid-3 department-subject-fields">
       <div><label for="code">Subject code</label><input id="code" name="code" type="text" maxlength="15" required></div>
       <div><label for="title">Title</label><input id="title" name="title" type="text" maxlength="120" required></div>
       <div><label for="units">Units</label><input id="units" name="units" type="number" min="1" max="30" value="3" required></div>
+      <div class="department-subject-submit"><button class="btn" type="submit">Create subject</button></div>
     </div>
-    <p class="form-actions"><button class="btn" type="submit">Create subject</button></p>
   </form>
 </section>
 <section class="card">

@@ -25,7 +25,7 @@ render_header($user, 'Registrar overview');
   <div class="stat"><span class="stat-label">ACTIVE STUDENTS</span><b><?= $active ?></b><span>Ready for services</span></div>
   <div class="stat"><span class="stat-label">ARCHIVED</span><b><?= $archived ?></b><span>Inactive records</span></div>
 </div>
-<div class="content-grid">
+<div class="content-grid registrar-overview-grid">
   <section class="card">
     <div class="section-title"><div><p class="card-kicker">ADMISSIONS</p><h2>Registration workload</h2></div><a class="btn" href="<?= e(url('/registrar/admissions.php')) ?>">Register student</a></div>
     <p>Registrar and Admissions staff can create accounts, student records, and current-term clearance records without waiting for an Admin operator.</p>

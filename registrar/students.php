@@ -171,15 +171,14 @@ render_header($user, 'Student records');
 </div>
 <?php endif; ?>
 
-<div class="toolbar"><form class="filters card" method="get">
-  <div><label for="q">Search students</label><input id="q" name="q" value="<?= e($q) ?>" placeholder="ID, name, program, or email"></div>
-  <div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year[]" multiple size="3"><?php foreach($validYears as $year): ?><option value="<?= e($year) ?>"<?= in_array($year,$selectedYears,true)?' selected':'' ?>><?= e($year) ?></option><?php endforeach; ?></select></div>
-  <div><label for="semester">Term / semester</label><select id="semester" name="semester[]" multiple size="3"><?php foreach($validSemesters as $semester): ?><option value="<?= e($semester) ?>"<?= in_array($semester,$selectedSemesters,true)?' selected':'' ?>><?= e(label($semester)) ?></option><?php endforeach; ?></select></div>
-  <div><label for="department">Department</label><select id="department" name="department[]" multiple size="3"><?php foreach($depts as $department): ?><option value="<?= (int)$department['id'] ?>"<?= in_array((string)$department['id'],$selectedDepartments,true)?' selected':'' ?>><?= e($department['code']) ?></option><?php endforeach; ?></select></div>
-  <div><label for="status">Enrollment status</label><select id="status" name="status[]" multiple size="3"><?php foreach(STUDENT_STATUSES as $s): ?><option value="<?= e($s) ?>"<?= in_array($s,$selectedStatuses,true)?' selected':'' ?>><?= e(label($s)) ?></option><?php endforeach; ?></select></div>
-  <button class="btn" type="submit">Apply filters</button><a class="btn alt" href="<?= e(url('/registrar/students.php')) ?>">Clear</a></form>
-  <a class="btn" href="<?= e(url('/registrar/admissions.php')) ?>">+ Register student</a>
-</div>
+<form class="filters card students-filters" method="get">
+  <div class="student-search-field"><label for="q">Search students</label><input id="q" name="q" type="search" value="<?= e($q) ?>" placeholder="ID, name, program, or email"></div>
+  <div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year"><option value="">All years</option><?php foreach($validYears as $year): ?><option value="<?= e($year) ?>"<?= in_array($year,$selectedYears,true)?' selected':'' ?>><?= e($year) ?></option><?php endforeach; ?></select></div>
+  <div><label for="semester">Term / semester</label><select id="semester" name="semester"><option value="">All terms</option><?php foreach($validSemesters as $semester): ?><option value="<?= e($semester) ?>"<?= in_array($semester,$selectedSemesters,true)?' selected':'' ?>><?= e(label($semester)) ?></option><?php endforeach; ?></select></div>
+  <div><label for="department">Department</label><select id="department" name="department"><option value="">All departments</option><?php foreach($depts as $department): ?><option value="<?= (int)$department['id'] ?>"<?= in_array((string)$department['id'],$selectedDepartments,true)?' selected':'' ?>><?= e($department['code']) ?></option><?php endforeach; ?></select></div>
+  <div><label for="status">Enrollment status</label><select id="status" name="status"><option value="">All statuses</option><?php foreach(STUDENT_STATUSES as $s): ?><option value="<?= e($s) ?>"<?= in_array($s,$selectedStatuses,true)?' selected':'' ?>><?= e(label($s)) ?></option><?php endforeach; ?></select></div>
+  <div class="filter-actions student-filter-actions"><button class="btn" type="submit">Apply filters</button><a class="btn alt" href="<?= e(url('/registrar/students.php')) ?>">Clear</a><a class="btn gold" href="<?= e(url('/registrar/admissions.php')) ?>">+ Register student</a></div>
+</form>
 
 <div class="tablewrap table-responsive"><table><thead><tr><th>Student</th><th>Program</th><th>Department</th><th>Status</th><th>Registered</th><th>Action</th></tr></thead><tbody>
 <?php foreach($rows as $r): ?><tr>

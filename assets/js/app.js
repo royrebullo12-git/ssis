@@ -85,102 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStudentUsername();
   });
 
-  const overviewContext = document.querySelector('[data-overview-context]');
-  if (overviewContext) {
-    const clock = overviewContext.querySelector('[data-live-clock]');
-    const updateClock = () => {
-      if (clock) {
-        clock.textContent = new Intl.DateTimeFormat('en-PH', {
-          timeZone: 'Asia/Manila',
-          hour: 'numeric',
-          minute: '2-digit',
-        }).format(new Date());
-      }
-    };
-    updateClock();
-    window.setInterval(updateClock, 30000);
-
-    const forecastRows = ['yesterday', 'today', 'tomorrow'].map((day) => ({
-      day,
-      temperature: overviewContext.querySelector(`[data-weather-temperature="${day}"]`),
-      condition: overviewContext.querySelector(`[data-weather-condition="${day}"]`),
-      icon: overviewContext.querySelector(`[data-weather-icon="${day}"]`),
-    }));
-    if (forecastRows.every(({ temperature, condition, icon }) => temperature && condition && icon)) {
-      const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=14.5995&longitude=120.9842&daily=weather_code,temperature_2m_max,temperature_2m_min&past_days=1&forecast_days=2&timezone=Asia%2FManila';
-      const weatherRequest = new AbortController();
-      const weatherTimeout = window.setTimeout(() => weatherRequest.abort(), 8000);
-      const weatherDescriptions = new Map([
-        [0, ['Clear', 'bi-sun']],
-        [1, ['Mostly clear', 'bi-sun']],
-        [2, ['Partly cloudy', 'bi-cloud-sun']],
-        [3, ['Cloudy', 'bi-clouds']],
-        [45, ['Foggy', 'bi-cloud-fog']],
-        [48, ['Foggy', 'bi-cloud-fog']],
-        [51, ['Light drizzle', 'bi-cloud-drizzle']],
-        [56, ['Freezing drizzle', 'bi-cloud-drizzle']],
-        [57, ['Freezing drizzle', 'bi-cloud-drizzle']],
-        [53, ['Drizzle', 'bi-cloud-drizzle']],
-        [55, ['Heavy drizzle', 'bi-cloud-drizzle']],
-        [66, ['Freezing rain', 'bi-cloud-rain']],
-        [67, ['Freezing rain', 'bi-cloud-rain']],
-        [61, ['Light rain', 'bi-cloud-rain']],
-        [63, ['Rain', 'bi-cloud-rain']],
-        [65, ['Heavy rain', 'bi-cloud-rain']],
-        [77, ['Snow grains', 'bi-cloud-snow']],
-        [71, ['Light snow', 'bi-cloud-snow']],
-        [73, ['Snow', 'bi-cloud-snow']],
-        [75, ['Heavy snow', 'bi-cloud-snow']],
-        [85, ['Snow showers', 'bi-cloud-snow']],
-        [86, ['Heavy snow showers', 'bi-cloud-snow']],
-        [80, ['Rain showers', 'bi-cloud-rain']],
-        [81, ['Rain showers', 'bi-cloud-rain']],
-        [82, ['Heavy showers', 'bi-cloud-rain-heavy']],
-        [95, ['Thunderstorm', 'bi-cloud-lightning-rain']],
-        [96, ['Thunderstorm', 'bi-cloud-lightning-rain']],
-        [99, ['Thunderstorm', 'bi-cloud-lightning-rain']],
-      ]);
-
-      fetch(weatherUrl, { headers: { Accept: 'application/json' }, signal: weatherRequest.signal })
-        .then((response) => {
-          if (!response.ok) throw new Error(`Weather service returned HTTP ${response.status}`);
-          return response.json();
-        })
-        .then((weather) => {
-          const daily = weather.daily;
-          if (!daily || !Array.isArray(daily.weather_code) || !Array.isArray(daily.temperature_2m_min)
-            || !Array.isArray(daily.temperature_2m_max) || daily.weather_code.length < 3
-            || daily.temperature_2m_min.length < 3 || daily.temperature_2m_max.length < 3) {
-            throw new Error('Weather service returned an incomplete forecast');
-          }
-          forecastRows.forEach(({ day, temperature, condition, icon }, index) => {
-            const min = Number(daily.temperature_2m_min[index]);
-            const max = Number(daily.temperature_2m_max[index]);
-            const code = Number(daily.weather_code[index]);
-            if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(code)) {
-              throw new Error(`Weather service returned incomplete ${day} forecast data`);
-            }
-            const [description, iconName] = weatherDescriptions.get(code) || ['Conditions', 'bi-cloud-sun'];
-            condition.textContent = description;
-            temperature.textContent = `${Math.round(min)}° – ${Math.round(max)}°C`;
-            icon.className = `bi ${iconName}`;
-            icon.setAttribute('aria-label', description);
-          });
-        })
-        .catch((error) => {
-          forecastRows.forEach(({ temperature, condition, icon }) => {
-            temperature.textContent = 'Unavailable';
-            condition.textContent = 'Forecast unavailable';
-            icon.className = 'bi bi-cloud-slash';
-          });
-          console.error('[WLS] Could not load overview weather:', error);
-        })
-        .finally(() => {
-          window.clearTimeout(weatherTimeout);
-        });
-    }
-  }
-
   document.querySelectorAll('[data-confirm]').forEach((el) => {
     el.addEventListener('click', (event) => {
       if (!window.confirm(el.getAttribute('data-confirm'))) event.preventDefault();
@@ -210,6 +114,18 @@ document.addEventListener('DOMContentLoaded', () => {
         window.sessionStorage.setItem(key, '1');
       });
     }
+  });
+
+  document.querySelectorAll('form.filters').forEach((form) => {
+    if (form.querySelector(':scope > .filter-actions')) return;
+    const actions = Array.from(form.children).filter((child) =>
+      child.matches('button[type="submit"], a.btn')
+    );
+    if (actions.length < 2) return;
+    const group = document.createElement('div');
+    group.className = 'filter-actions';
+    actions.forEach((action) => group.append(action));
+    form.append(group);
   });
 
   document.querySelectorAll('table').forEach((table) => {

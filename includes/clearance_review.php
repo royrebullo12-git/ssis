@@ -109,13 +109,13 @@ function clearance_review_page(array $user, string $type, string $title): void
        . ($type === 'cashier' ? '. A clearance can only be approved when the student has no unpaid balance.' : '') . '</p>';
     echo '<form class="filters card" method="get"><div><label for="q">Search</label><input id="q" name="q" type="search" value="' . e($q) . '" placeholder="Student no. or name"></div>';
     if ($registrarFilters) {
-        echo '<div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year[]" multiple size="3">';
+        echo '<div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year"><option value="">All years</option>';
         foreach ($years as $year) echo '<option value="' . e($year) . '"' . (in_array($year, $selectedYears, true) ? ' selected' : '') . '>' . e($year) . '</option>';
-        echo '</select></div><div><label for="semester">Term / semester</label><select id="semester" name="semester[]" multiple size="3">';
+        echo '</select></div><div><label for="semester">Term / semester</label><select id="semester" name="semester"><option value="">All terms</option>';
         foreach (['1st', '2nd', 'summer'] as $term) echo '<option value="' . e($term) . '"' . (in_array($term, $selectedSemesters, true) ? ' selected' : '') . '>' . e(label($term)) . '</option>';
-        echo '</select></div><div><label for="department">Department</label><select id="department" name="department[]" multiple size="3">';
+        echo '</select></div><div><label for="department">Department</label><select id="department" name="department"><option value="">All departments</option>';
         foreach ($departments as $department) echo '<option value="' . (int)$department['id'] . '"' . (in_array((string)$department['id'], $selectedDepartments, true) ? ' selected' : '') . '>' . e($department['code']) . '</option>';
-        echo '</select></div><div><label for="status">Status</label><select id="status" name="status[]" multiple size="3">';
+        echo '</select></div><div><label for="status">Status</label><select id="status" name="status"><option value="">All statuses</option>';
         foreach (['pending', 'approved', 'rejected'] as $clearanceStatus) echo '<option value="' . e($clearanceStatus) . '"' . (in_array($clearanceStatus, $selectedStatuses, true) ? ' selected' : '') . '>' . e(label($clearanceStatus)) . '</option>';
         echo '</select></div>';
     } else {

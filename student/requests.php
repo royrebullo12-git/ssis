@@ -101,6 +101,11 @@ $reqs = $st->fetchAll();
 
 render_header($user, 'Student requests');
 ?>
+<div class="tabs" data-tabs role="tablist" aria-label="Student request categories">
+  <button type="button" role="tab" id="tab-document-requests" aria-controls="panel-document-requests" aria-selected="true">Documents</button>
+  <button type="button" role="tab" id="tab-drop-course" aria-controls="panel-drop-course" aria-selected="false">Drop Course</button>
+</div>
+<section class="tab-panel" id="panel-document-requests" role="tabpanel" aria-labelledby="tab-document-requests">
 <div class="card">
   <p class="card-kicker">OFFICIAL DOCUMENTS</p><h2>Request a document</h2>
   <?= form_open('create') ?>
@@ -111,7 +116,7 @@ render_header($user, 'Student requests');
       <div class="col-12 col-md-4"><label for="copies">Copies</label><input id="copies" name="copies" type="number" min="1" max="10" value="1" required></div>
     </div>
     <label for="purpose">Purpose</label><input id="purpose" name="purpose" type="text" maxlength="255" required placeholder="e.g. Scholarship application">
-    <p><button class="btn" type="submit">Submit request</button></p>
+    <div class="form-actions"><button class="btn" type="submit">Submit request</button></div>
   </form>
 </div>
 <h2>My document requests</h2>
@@ -127,11 +132,12 @@ render_header($user, 'Student requests');
         <?= form_open('cancel') ?><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
         <button class="btn danger sm" type="submit" data-confirm="Cancel this request?">Cancel</button></form><?php endif; ?></td></tr>
 <?php endforeach; ?></tbody></table></div>
-<?php endif;
-?>
+<?php endif; ?>
+</section>
+<section class="tab-panel" id="panel-drop-course" role="tabpanel" aria-labelledby="tab-drop-course" hidden>
 <section class="card">
   <p class="card-kicker">REGISTRAR / DEPARTMENT WORKFLOW</p><h2>Drop a course</h2>
-  <p class="muted">Submit an official request with your reason. It will be routed to the department responsible for the subject; enrollment changes only after approval.</p>
+  <p class="muted">Open this section to submit an official request. It will be routed to the department responsible for the subject; enrollment changes only after approval.</p>
   <?php if (!$dropClasses): ?><div class="empty">No currently enrolled subjects are available for a new drop request.</div>
   <?php else: ?>
     <?= form_open('drop') ?>
@@ -158,4 +164,5 @@ render_header($user, 'Student requests');
   <td><?= e(fmt_date($request['created_at'])) ?></td>
 </tr><?php endforeach; ?>
 </tbody></table></div><?php endif; ?>
+</section>
 <?php render_footer(); ?>

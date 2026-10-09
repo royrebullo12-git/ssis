@@ -34,7 +34,9 @@ render_header($user, 'Enrollment status');
       <h2>Record archived</h2>
       <p>This student record is archived. Contact the Registrar if you believe it should be active.</p>
     <?php endif; ?>
+    
   </section>
+  
   <aside class="card">
     <p class="card-kicker">STUDENT RECORD</p>
     <dl class="details">
@@ -47,7 +49,6 @@ render_header($user, 'Enrollment status');
     </dl>
   </aside>
 </div>
-<?php if ($unitStatus['status'] === 'unconfigured'): ?><div class="msg info" role="status">Your regular/irregular standing will appear once the Registrar configures your program's standard units for the current term.</div><?php endif; ?>
 <div class="card"><h2>Registered classes</h2>
   <?php if (!$classes): ?><p class="empty">No subject offerings are currently linked to your student record.</p>
   <?php else: ?><div class="tablewrap table-responsive"><table><thead><tr><th>Subject</th><th>Section</th><th>Term</th><th>Schedule</th><th>Professor</th><th>Status</th></tr></thead><tbody>

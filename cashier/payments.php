@@ -123,21 +123,64 @@ render_header($user, 'Payments');
   <div class="stat"><b><?= (int)$balanceBreakdown['partial'] ?></b><span>Partially paid student balances</span></div>
   <div class="stat"><b><?= (int)$balanceBreakdown['fully_paid'] ?></b><span>Fully paid student balances</span></div>
 </div>
-<div class="card"><h2>New charge</h2>
-  <?= form_open('charge') ?><div class="row g-3">
-    <div class="col-12 col-md-6 col-xl-4"><label for="student_id">Student</label><select id="student_id" name="student_id" required>
-      <?php foreach ($students as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['student_no'] . ' - ' . $s['last_name'] . ', ' . $s['first_name']) ?></option><?php endforeach; ?></select></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="description">Description</label><input id="description" name="description" type="text" maxlength="150" required placeholder="e.g. Laboratory fee"></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="amount">Amount (₱)</label><input id="amount" name="amount" type="number" step="0.01" min="0.01" required></div>
-  </div><p><button class="btn" type="submit">Create charge</button></p></form>
+<div class="row g-4">
+  <div class="col-lg-6">
+    <section class="card h-100">
+      <div class="card-body">
+        <h2>New charge</h2>
+        <?= form_open('charge') ?>
+          <div class="mb-3">
+            <label class="form-label" for="student_id">Student</label>
+            <select class="form-select w-100" id="student_id" name="student_id" required>
+              <?php foreach ($students as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['student_no'] . ' - ' . $s['last_name'] . ', ' . $s['first_name']) ?></option><?php endforeach; ?>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="description">Description</label>
+            <input class="form-control w-100" id="description" name="description" type="text" maxlength="150" required placeholder="e.g. Laboratory fee">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="amount">Amount (₱)</label>
+            <input class="form-control w-100" id="amount" name="amount" type="number" step="0.01" min="0.01" required>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Create charge</button>
+        </form>
+      </div>
+    </section>
+  </div>
+  <div class="col-lg-6">
+    <form class="card h-100" method="get">
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label" for="q">Search</label>
+          <input class="form-control w-100" id="q" name="q" type="search" value="<?= e($q) ?>" placeholder="Student no., name or reference">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="status">Status</label>
+          <select class="form-select w-100" id="status" name="status">
+            <option value="">All</option>
+            <?php foreach (['unpaid', 'partial', 'paid', 'void'] as $s): ?><option value="<?= $s ?>"<?= $s === $status ? ' selected' : '' ?>><?= e(label($s)) ?></option><?php endforeach; ?>
+          </select>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label" for="date_from">Date paid from</label>
+            <input class="form-control w-100" id="date_from" name="date_from" type="date" value="<?= e($dateFrom) ?>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="date_to">Date paid to</label>
+            <input class="form-control w-100" id="date_to" name="date_to" type="date" value="<?= e($dateTo) ?>">
+          </div>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-nowrap">
+          <button class="btn btn-primary btn-sm text-nowrap" type="submit">Filter</button>
+          <a class="btn btn-outline-secondary btn-sm text-nowrap" href="<?= e(url('/cashier/payments.php')) ?>">Clear</a>
+          <a class="btn btn-outline-secondary btn-sm text-nowrap" href="<?= e(url('/cashier/collections.php')) ?>">Collection report</a>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
-<form class="filters card" method="get"><div><label for="q">Search</label><input id="q" name="q" type="text" value="<?= e($q) ?>" placeholder="Student no., name or reference"></div>
-  <div><label for="status">Status</label><select id="status" name="status"><option value="">All</option>
-  <?php foreach (['unpaid', 'partial', 'paid', 'void'] as $s): ?><option value="<?= $s ?>"<?= $s === $status ? ' selected' : '' ?>><?= e(label($s)) ?></option><?php endforeach; ?></select></div>
-  <div><label for="date_from">Date paid from</label><input id="date_from" name="date_from" type="date" value="<?= e($dateFrom) ?>"></div>
-  <div><label for="date_to">Date paid to</label><input id="date_to" name="date_to" type="date" value="<?= e($dateTo) ?>"></div>
-  <button class="btn" type="submit">Filter</button><a class="btn alt" href="<?= e(url('/cashier/payments.php')) ?>">Clear</a>
-  <a class="btn alt" href="<?= e(url('/cashier/collections.php')) ?>">Collection report</a></form>
   <?php if ($invalidDateRange): ?><div class="msg error" role="alert">Enter valid payment dates and ensure the start date is not after the end date.</div><?php endif; ?>
 <?php if (!$rows): ?><div class="card empty">No payments match.</div><?php else: ?>
 <div class="tablewrap table-responsive"><table><thead><tr><th>Reference</th><th>Student</th><th>Description</th><th class="num">Due</th><th class="num">Paid</th><th>Status</th><th>Record payment</th></tr></thead><tbody>

@@ -116,28 +116,8 @@ $rows = $rowQuery->fetchAll();
 
 render_header($user, 'Enrollment processing');
 ?>
-<div class="card"><h2>Enroll a student in an offering</h2>
-  <?php if (!$students || !$offerings): ?><p class="empty">An active student and an active department offering are required before enrollment.</p>
-  <?php else: ?>
-  <?= form_open() ?><div class="row g-3">
-    <div class="col-12 col-md-6"><label for="student_id">Student</label><select id="student_id" name="student_id" required>
-      <?php foreach ($students as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['student_no'] . ' - ' . $s['last_name'] . ', ' . $s['first_name']) ?></option><?php endforeach; ?>
-    </select></div>
-    <div class="col-12 col-md-6"><label for="subject_offering_id">Subject offering</label><select id="subject_offering_id" name="subject_offering_id" required>
-      <?php foreach ($offerings as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['code'] . ' - ' . $o['title'] . ' / ' . $o['academic_year'] . ' ' . $o['semester'] . ' / ' . $o['section'] . ' / ' . $o['professor']) ?></option><?php endforeach; ?>
-    </select></div>
-  </div><p><button class="btn" type="submit">Enroll student</button></p></form>
-  <?php endif; ?>
-</div>
-<div class="card"><h2>Recent enrollments</h2>
-  <form class="filters card" method="get">
-    <div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year[]" multiple size="3"><?php foreach ($termYears as $year): ?><option value="<?= e($year) ?>"<?= in_array($year, $years, true) ? ' selected' : '' ?>><?= e($year) ?></option><?php endforeach; ?></select></div>
-    <div><label for="semester">Term / semester</label><select id="semester" name="semester[]" multiple size="3"><?php foreach (['1st', '2nd', 'summer'] as $semester): ?><option value="<?= e($semester) ?>"<?= in_array($semester, $semesters, true) ? ' selected' : '' ?>><?= e(label($semester)) ?></option><?php endforeach; ?></select></div>
-    <div><label for="department">Department</label><select id="department" name="department[]" multiple size="3"><?php foreach ($departments as $department): ?><option value="<?= (int)$department['id'] ?>"<?= in_array((string)$department['id'], $departmentIds, true) ? ' selected' : '' ?>><?= e($department['code']) ?></option><?php endforeach; ?></select></div>
-    <div><label for="status">Enrollment status</label><select id="status" name="status[]" multiple size="3"><?php foreach (['pending', 'enrolled', 'dropped'] as $enrollmentStatus): ?><option value="<?= e($enrollmentStatus) ?>"<?= in_array($enrollmentStatus, $statuses, true) ? ' selected' : '' ?>><?= e(label($enrollmentStatus)) ?></option><?php endforeach; ?></select></div>
-    <button class="btn" type="submit">Apply filters</button><a class="btn alt" href="<?= e(url('/registrar/enrollments.php')) ?>">Clear</a>
-  </form>
-  <label for="enrollment-filter">Search enrollments</label><input id="enrollment-filter" type="text" data-filter="#registrar-enrollments" placeholder="Student, subject, section, or term">
+<section class="card enrollment-results-card">
+  <h2>Recent enrollments</h2>
   <div class="tablewrap table-responsive"><table id="registrar-enrollments"><thead><tr><th>Student</th><th>Department</th><th>Subject offering</th><th>Professor</th><th>Term</th><th>Status</th></tr></thead><tbody>
   <?php foreach ($rows as $r): ?><tr>
     <td><?= e($r['student_no'] . ' - ' . $r['last_name'] . ', ' . $r['first_name']) ?></td><td><?= e($r['department_code']) ?></td>
@@ -145,5 +125,31 @@ render_header($user, 'Enrollment processing');
     <td><?= e($r['academic_year'] . ', ' . $r['semester']) ?></td><td><?= badge($r['status']) ?></td>
   </tr><?php endforeach; ?>
   </tbody></table></div>
+</section>
+<div class="enrollment-processing-grid">
+  <div class="card enrollment-recent"><h2>Recent enrollment filters</h2>
+    <form class="filters card" method="get">
+      <div><label for="academic_year">Academic year</label><select id="academic_year" name="academic_year"><option value="">All years</option><?php foreach ($termYears as $year): ?><option value="<?= e($year) ?>"<?= in_array($year, $years, true) ? ' selected' : '' ?>><?= e($year) ?></option><?php endforeach; ?></select></div>
+      <div><label for="semester">Term / semester</label><select id="semester" name="semester"><option value="">All terms</option><?php foreach (['1st', '2nd', 'summer'] as $semester): ?><option value="<?= e($semester) ?>"<?= in_array($semester, $semesters, true) ? ' selected' : '' ?>><?= e(label($semester)) ?></option><?php endforeach; ?></select></div>
+      <div><label for="department">Department</label><select id="department" name="department"><option value="">All departments</option><?php foreach ($departments as $department): ?><option value="<?= (int)$department['id'] ?>"<?= in_array((string)$department['id'], $departmentIds, true) ? ' selected' : '' ?>><?= e($department['code']) ?></option><?php endforeach; ?></select></div>
+      <div><label for="status">Enrollment status</label><select id="status" name="status"><option value="">All statuses</option><?php foreach (['pending', 'enrolled', 'dropped'] as $enrollmentStatus): ?><option value="<?= e($enrollmentStatus) ?>"<?= in_array($enrollmentStatus, $statuses, true) ? ' selected' : '' ?>><?= e(label($enrollmentStatus)) ?></option><?php endforeach; ?></select></div>
+      <button class="btn" type="submit">Apply filters</button><a class="btn alt" href="<?= e(url('/registrar/enrollments.php')) ?>">Clear</a>
+      <div class="enrollment-filter-search"><label for="enrollment-filter">Search enrollments</label><input id="enrollment-filter" type="search" data-filter="#registrar-enrollments" placeholder="Student, subject, section, or term"></div>
+    </form>
+  </div>
+  <div class="card enrollment-entry"><h2>Enroll a student in an offering</h2>
+    <?php if (!$students || !$offerings): ?><p class="empty">An active student and an active department offering are required before enrollment.</p>
+    <?php else: ?>
+    <?= form_open('', 'class="enrollment-form"') ?>
+      <div><label for="student_id">Student</label><select id="student_id" name="student_id" required>
+        <?php foreach ($students as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['student_no'] . ' - ' . $s['last_name'] . ', ' . $s['first_name']) ?></option><?php endforeach; ?>
+      </select></div>
+      <div><label for="subject_offering_id">Subject offering</label><select id="subject_offering_id" name="subject_offering_id" required>
+        <?php foreach ($offerings as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['code'] . ' - ' . $o['title'] . ' / ' . $o['academic_year'] . ' ' . $o['semester'] . ' / ' . $o['section'] . ' / ' . $o['professor']) ?></option><?php endforeach; ?>
+      </select></div>
+      <button class="btn" type="submit">Enroll student</button>
+    </form>
+    <?php endif; ?>
+  </div>
 </div>
 <?php render_footer();

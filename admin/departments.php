@@ -38,12 +38,12 @@ render_header($user, 'Department directory');
 <section class="card">
   <p class="card-kicker">UNIVERSITY DIRECTORY</p><h2>Add a department or issuing office</h2>
   <p class="muted">Create department records before assigning department-issued document types or provisioning department portal accounts.</p>
-  <?= form_open('create') ?>
-    <div class="form-grid">
+  <?= form_open('create', 'class="department-create-form"') ?>
+    <div class="department-create-fields">
       <div><label for="code">Department code</label><input id="code" name="code" maxlength="10" pattern="[A-Za-z0-9]{2,10}" required placeholder="GUIDE"></div>
       <div><label for="name">Department name</label><input id="name" name="name" maxlength="120" required placeholder="Guidance Office"></div>
+      <button class="btn" type="submit">Add department</button>
     </div>
-    <p class="form-actions"><button class="btn" type="submit">Add department</button></p>
   </form>
 </section>
 <section class="card">

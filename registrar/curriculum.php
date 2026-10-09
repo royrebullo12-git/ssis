@@ -46,15 +46,15 @@ render_header($user, 'Curriculum unit requirements');
 <section class="card">
   <p class="card-kicker">REGULAR / IRREGULAR CLASSIFICATION</p><h2>Configure expected units</h2>
   <p class="muted">The student portal compares enrolled units for a student’s program, year level, and term with this requirement. Saving the same program/year/term updates its unit target.</p>
-  <?= form_open('save') ?>
+  <?= form_open('save', 'class="curriculum-requirement-form"') ?>
     <div class="form-grid form-grid-3">
       <div><label for="program">Program name</label><input id="program" name="program" maxlength="100" required placeholder="BS Information Technology"></div>
       <div><label for="year_level">Year level</label><select id="year_level" name="year_level"><?php for ($level = 1; $level <= 6; $level++): ?><option value="<?= $level ?>"><?= $level ?></option><?php endfor; ?></select></div>
       <div><label for="academic_year">Academic year</label><input id="academic_year" name="academic_year" pattern="\d{4}-\d{4}" maxlength="9" value="<?= e(CURRENT_SY) ?>" required></div>
       <div><label for="semester">Term</label><select id="semester" name="semester"><?php foreach (['1st', '2nd', 'summer'] as $semester): ?><option value="<?= e($semester) ?>"<?= $semester === CURRENT_SEM ? ' selected' : '' ?>><?= e(label($semester)) ?></option><?php endforeach; ?></select></div>
       <div><label for="required_units">Expected units</label><input id="required_units" name="required_units" type="number" min="1" max="40" required></div>
+      <div class="curriculum-submit"><button class="btn" type="submit">Save unit requirement</button></div>
     </div>
-    <p class="form-actions"><button class="btn" type="submit">Save unit requirement</button></p>
   </form>
 </section>
 <section class="card">

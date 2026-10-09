@@ -49,7 +49,7 @@ render_header($user, 'Document requests');
 <form class="filters card" method="get"><div><label for="status">Show</label><select id="status" name="status">
   <option value="open"<?= $status === 'open' ? ' selected' : '' ?>>Open requests</option>
   <?php foreach ($allowed as $s): ?><option value="<?= $s ?>"<?= $s === $status ? ' selected' : '' ?>><?= e(label($s)) ?></option><?php endforeach; ?></select></div>
-  <div><label for="department">Student department</label><select id="department" name="department[]" multiple size="3"><?php foreach ($departments as $department): ?><option value="<?= (int)$department['id'] ?>"<?= in_array((string)$department['id'], $selectedDepartments, true) ? ' selected' : '' ?>><?= e($department['code']) ?></option><?php endforeach; ?></select></div>
+  <div><label for="department">Student department</label><select id="department" name="department"><option value="">All departments</option><?php foreach ($departments as $department): ?><option value="<?= (int)$department['id'] ?>"<?= in_array((string)$department['id'], $selectedDepartments, true) ? ' selected' : '' ?>><?= e($department['code']) ?></option><?php endforeach; ?></select></div>
   <button class="btn" type="submit">Apply filters</button><a class="btn alt" href="<?= e(url('/registrar/requests.php')) ?>">Clear</a></form>
 <?php if (!$rows): ?><div class="card empty">No requests in this view.</div><?php else: ?>
 <div class="tablewrap table-responsive"><table><thead><tr><th>#</th><th>Student</th><th>Document</th><th>Issuing office</th><th>Fee</th><th>Status</th><th>Action</th></tr></thead><tbody>

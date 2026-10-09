@@ -125,12 +125,13 @@ $offerings = $query->fetchAll();
 
 render_header($user, 'Faculty profiles and instructor assignments');
 ?>
+<div class="faculty-setup-grid">
 <section class="card">
   <p class="card-kicker">FACULTY DIRECTORY</p><h2>Add a faculty profile</h2>
   <?= form_open('save_professor') ?>
     <div class="form-grid form-grid-3">
       <div><label for="first_name">First name</label><input id="first_name" name="first_name" maxlength="60" required></div>
-      <div><label for="last_name">Last name</label><input id="last_name" name="last_name" maxlength="60" required></div>
+      <div class="faculty-last-name"><label for="last_name">Last name</label><input id="last_name" name="last_name" maxlength="60" required></div>
       <div><label for="email">Email</label><input id="email" name="email" type="email" maxlength="120"></div>
     </div>
     <p class="form-actions"><button class="btn" type="submit">Add faculty profile</button></p>
@@ -174,6 +175,7 @@ render_header($user, 'Faculty profiles and instructor assignments');
     </form>
   <?php endif; ?>
 </section>
+</div>
 <section class="card">
   <h2>Subject offerings and assignments</h2>
   <?php if (!$offerings): ?><div class="empty">No instructor assignments have been created.</div><?php else: ?>

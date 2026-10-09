@@ -169,6 +169,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } finally {
         if ($studentNumberYear !== null) release_student_number_lock($pdo, $studentNumberYear);
     }
+    if ($action === 'create') {
+        header('Location: ' . url('/admin/create_account.php'));
+        exit;
+    }
     redirect_self();
 }
 
@@ -180,32 +184,10 @@ $st = $pdo->prepare('SELECT u.*, d.code AS dept, (u.locked_until > NOW()) AS is_
 $st->execute([$q, $like, $like, $role, $role]);
 $rows = $st->fetchAll();
 $depts = $pdo->query('SELECT id, code, name FROM departments ORDER BY code')->fetchAll();
-$deptOpts = '<option value="">None</option>';
-foreach ($depts as $d) $deptOpts .= '<option value="' . (int)$d['id'] . '">' . e($d['code'] . ' - ' . $d['name']) . '</option>';
 
-render_header($user, 'User accounts');
+render_header($user, 'User management');
 ?>
-<div class="card"><h2>Create an account</h2>
-  <?= form_open('create', 'class="account-create-form"') ?><div class="row g-3">
-    <div class="col-12 col-md-6 col-xl-4"><label for="username">Username</label><input id="username" name="username" type="text" maxlength="50" autocomplete="off" data-account-username><small class="field-help" data-account-username-help>For students, the ID and username are generated automatically.</small></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="email">Email</label><input id="email" name="email" type="email" maxlength="120" required></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="mobile_phone">Mobile number</label><input id="mobile_phone" name="mobile_phone" type="tel" maxlength="20" required autocomplete="tel" placeholder="+639171234567"></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="role">Role</label><select id="role" name="role" required><?php foreach (ALL_ROLES as $r): ?><option value="<?= $r ?>"><?= e(label($r)) ?></option><?php endforeach; ?></select></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="department_id">Department (students, professors and department staff)</label><select id="department_id" name="department_id"><?= $deptOpts ?></select></div>
-  </div>
-  <div class="row g-3 mt-0">
-    <div class="col-12 col-md-6 col-xl-4"><label for="first_name">First name (students / professors)</label><input id="first_name" name="first_name" type="text" maxlength="60"></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="last_name">Last name (students / professors)</label><input id="last_name" name="last_name" type="text" maxlength="60"></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="program">Program (students)</label><input id="program" name="program" type="text" maxlength="100"></div>
-    <div class="col-12 col-md-6 col-xl-4"><label for="year_level">Year level (students)</label><input id="year_level" name="year_level" type="number" min="1" max="6" value="1"></div>
-    <div class="col-12 col-md-6 col-xl-4" data-student-only hidden><label for="admission_year">Admission school year</label><input id="admission_year" name="admission_year" type="text" maxlength="9" pattern="\d{4}-\d{4}" value="<?= e(CURRENT_SY) ?>"><small class="field-help">The first year sets the generated student ID prefix.</small></div>
-  </div>
-  <div class="account-form-submit d-flex flex-wrap align-items-center gap-2">
-    <button class="btn" type="submit">Create account and send credentials</button>
-    <small>A secure temporary password is sent by SMS to the registered mobile number.</small>
-  </div></form>
-</div>
-<form class="filters" method="get"><div><label for="q">Search</label><input id="q" name="q" type="text" value="<?= e($q) ?>" placeholder="Username or email"></div>
+<form class="filters card admin-user-filters" method="get"><div><label for="q">Search</label><input id="q" name="q" type="search" value="<?= e($q) ?>" placeholder="Username or email"></div>
   <div><label for="frole">Role</label><select id="frole" name="role"><option value="">All</option><?php foreach (ALL_ROLES as $r): ?><option value="<?= $r ?>"<?= $r === $role ? ' selected' : '' ?>><?= e(label($r)) ?></option><?php endforeach; ?></select></div>
   <button class="btn" type="submit">Filter</button></form>
 <div class="tablewrap table-responsive"><table><thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Last sign-in</th><th>Manage</th></tr></thead><tbody>

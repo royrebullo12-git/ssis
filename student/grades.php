@@ -58,7 +58,8 @@ render_header($user, 'My grades');
 if (!$terms): ?>
   <div class="card empty">No enrolled subjects were found for any term.</div>
 <?php else: ?>
-  <form class="filters" method="get"><div><label for="term">Term</label><select id="term" name="term">
+  <section class="card grades-table-card">
+  <form class="filters grades-term-filter" method="get"><div><label for="term">Term</label><select id="term" name="term">
     <?php foreach ($terms as $term): $value = $term['academic_year'] . '|' . $term['semester']; ?>
       <option value="<?= e($value) ?>"<?= $value === "$sy|$sem" ? ' selected' : '' ?>><?= e($term['academic_year'] . ', ' . ['1st' => '1st Semester', '2nd' => '2nd Semester', 'summer' => 'Summer Term'][$term['semester']]) ?></option>
     <?php endforeach; ?></select></div><button class="btn" type="submit">View</button></form>
@@ -70,6 +71,7 @@ if (!$terms): ?>
       <td><?= e($row['professor']) ?></td><td class="num"><?= (int)$row['units'] ?></td>
       <td class="num"><?php if ($row['computed_final'] === null): ?><span class="badge secondary">Pending</span><?php else: $gradeValue = (float)$row['computed_final']; ?><span class="badge <?= $gradeValue <= 3.0 ? 'good' : 'bad' ?>"><?= e(number_format($gradeValue, 2)) ?> · <?= $gradeValue <= 3.0 ? 'Pass' : 'Failed' ?></span><?php endif; ?></td></tr>
   <?php endforeach; endif; ?></tbody></table></div>
+  </section>
   <p><strong>General weighted average:</strong> <?= $units ? e(number_format($points / $units, 2)) : 'Not available yet' ?>
     <small>(approved and graded subjects only; 1.00 is the highest)</small></p>
   <section class="grade-legend-footer" aria-label="Grading scale legend">

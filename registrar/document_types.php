@@ -65,17 +65,18 @@ render_header($user, 'Document types and routing');
 <section class="card">
   <p class="card-kicker">DOCUMENT CATALOG</p><h2>Add a document type</h2>
   <p class="muted">Choose the issuing office and, for department-issued documents, the department account that should receive requests.</p>
-  <?= form_open('create') ?>
+  <?= form_open('create', 'class="document-type-form"') ?>
     <div class="form-grid form-grid-3">
       <div><label for="name">Document name</label><input id="name" name="name" maxlength="100" required></div>
       <div><label for="fee">Fee per copy (₱)</label><input id="fee" name="fee" type="number" min="0" max="100000" step="0.01" value="0" required></div>
       <div><label for="processing_days">Processing time (days)</label><input id="processing_days" name="processing_days" type="number" min="1" max="120" value="3" required></div>
       <div><label for="issuing_office">Issuing office label</label><input id="issuing_office" name="issuing_office" maxlength="120" value="Registrar" required></div>
-      <div><label for="issuing_department_id">Route to department</label><select id="issuing_department_id" name="issuing_department_id"><option value="">Registrar office</option>
-        <?php foreach ($departments as $department): ?><option value="<?= (int)$department['id'] ?>"><?= e($department['code'] . ' · ' . $department['name']) ?></option><?php endforeach; ?>
-      </select><small class="field-help">Ask an Admin to add a missing office (for example, Guidance) to the Department directory before routing requests to it.</small></div>
+      <div class="document-route-field"><label for="issuing_department_id">Route to department</label>
+        <div class="document-route-controls"><select id="issuing_department_id" name="issuing_department_id"><option value="">Registrar office</option>
+          <?php foreach ($departments as $department): ?><option value="<?= (int)$department['id'] ?>"><?= e($department['code'] . ' · ' . $department['name']) ?></option><?php endforeach; ?>
+        </select><button class="btn" type="submit">Add document type</button></div>
+      </div>
     </div>
-    <p class="form-actions"><button class="btn" type="submit">Add document type</button></p>
   </form>
 </section>
 <section class="card">

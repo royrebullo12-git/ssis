@@ -34,12 +34,12 @@ if ($offeringId) {
 
 render_header($user, 'Department class lists');
 ?>
-<form class="filters" method="get"><div><label for="offering">Subject offering</label><select id="offering" name="offering" required>
+<form class="filters card class-list-filters" method="get"><div><label for="offering">Subject offering</label><select id="offering" name="offering" required>
   <option value="">Choose an offering</option>
   <?php foreach ($offerings as $offering): ?><option value="<?= (int)$offering['id'] ?>"<?= (int)$offering['id'] === $offeringId ? ' selected' : '' ?>><?= e($offering['code'] . ' - ' . $offering['title'] . ' / ' . $offering['academic_year'] . ' ' . $offering['semester'] . ' / ' . $offering['section']) ?></option><?php endforeach; ?>
-</select></div><button class="btn" type="submit">View class</button></form>
+</select></div><div class="filter-actions"><button class="btn" type="submit">View class</button></div></form>
 <?php if ($offeringId && !$rows): ?><div class="card empty">No enrolled students in this offering.</div>
-<?php elseif ($rows): ?><div class="card"><h2>Enrolled students</h2><label for="class-filter">Search students</label><input id="class-filter" type="text" data-filter="#department-class-list" placeholder="Student number, name, or program">
+<?php elseif ($rows): ?><div class="card class-list-results"><h2>Enrolled students</h2><div class="list-search-field"><label for="class-filter">Search students</label><input id="class-filter" type="search" data-filter="#department-class-list" placeholder="Student number, name, or program"></div>
   <div class="tablewrap table-responsive"><table id="department-class-list"><thead><tr><th>Student number</th><th>Student</th><th>Program</th><th>Enrollment</th><th>Grade status</th></tr></thead><tbody>
   <?php foreach ($rows as $row): ?>
     <tr><td><?= e($row['student_no']) ?></td><td><?= e($row['last_name'] . ', ' . $row['first_name']) ?></td><td><?= e($row['program']) ?></td>
