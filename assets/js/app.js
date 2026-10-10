@@ -23,8 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   if (shell && sidebar && sidebarToggle) {
-    const storedSidebarPreference = window.localStorage.getItem(sidebarPreferenceKey) === 'true';
-    setSidebarPinned(desktopSidebar.matches && storedSidebarPreference);
+    const storedSidebarPreference = window.localStorage.getItem(sidebarPreferenceKey);
+    setSidebarPinned(desktopSidebar.matches && storedSidebarPreference !== 'false');
 
     sidebar.addEventListener('show.bs.offcanvas', () => {
       if (mobileSidebarToggle) mobileSidebarToggle.setAttribute('aria-expanded', 'true');
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     desktopSidebar.addEventListener('change', (event) => {
-      const pinned = event.matches && window.localStorage.getItem(sidebarPreferenceKey) === 'true';
+      const pinned = event.matches && window.localStorage.getItem(sidebarPreferenceKey) !== 'false';
       setSidebarPinned(pinned);
       sidebar.classList.remove('sidebar-hover-open');
     });
@@ -88,6 +88,31 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-confirm]').forEach((el) => {
     el.addEventListener('click', (event) => {
       if (!window.confirm(el.getAttribute('data-confirm'))) event.preventDefault();
+    });
+  });
+
+  document.querySelectorAll('[data-dialog-open]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const dialog = document.getElementById(button.dataset.dialogOpen);
+      if (!dialog || dialog.tagName !== 'DIALOG') return;
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute('open', '');
+        dialog.querySelector('button, input, textarea, select')?.focus();
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-dialog-close]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const dialog = button.closest('dialog');
+      if (!dialog) return;
+      if (typeof dialog.close === 'function') {
+        dialog.close();
+      } else {
+        dialog.removeAttribute('open');
+      }
     });
   });
 

@@ -60,7 +60,7 @@ function render_header(array $user, string $title): void
        . '<link rel="stylesheet" href="' . e(url('/assets/css/wls.css')) . '?v=' . (string)filemtime(__DIR__ . '/../assets/css/wls.css') . '">'
        . '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>'
        . '<script src="' . e(url('/assets/js/app.js')) . '?v=' . (string)filemtime(__DIR__ . '/../assets/js/app.js') . '" defer></script></head><body>';
-    echo '<div class="app-shell" data-app-shell data-sidebar-key="' . e('wls-sidebar-pinned-' . (int)$user['id']) . '"><aside class="sidebar offcanvas-lg offcanvas-start" id="portal-sidebar" tabindex="-1" aria-label="Main navigation">'
+    echo '<div class="app-shell" data-app-shell data-sidebar-key="' . e('wls-sidebar-pinned-v2-' . (int)$user['id']) . '"><aside class="sidebar offcanvas-lg offcanvas-start" id="portal-sidebar" tabindex="-1" aria-label="Main navigation">'
        . '<div class="offcanvas-header sidebar-mobile-header"><a class="side-brand" href="' . e(url(ROLE_HOME[$role])) . '"><img src="' . e(url('/assets/wls-logo.svg')) . '" alt=""><span>WLSU</span></a>'
        . '<button class="btn-close" type="button" data-bs-dismiss="offcanvas" data-bs-target="#portal-sidebar" aria-label="Close navigation"></button></div>'
        . '<div class="sidebar-brand-row sidebar-desktop-brand"><a class="side-brand" href="' . e(url(ROLE_HOME[$role])) . '"><img src="' . e(url('/assets/wls-logo.svg')) . '" alt=""><span>WLSU</span></a>'
